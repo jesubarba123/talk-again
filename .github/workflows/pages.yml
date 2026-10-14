@@ -1,5 +1,6 @@
 # Publica la app en GitHub Pages cada vez que cambia la rama main.
-# Requisito (una sola vez): en el repositorio, Settings → Pages → Build and deployment → Source: "GitHub Actions".
+# Requisito: repositorio público (o cuenta con Pages privado). El workflow intenta activar Pages solo;
+# si falla, en el repositorio: Settings → Pages → Build and deployment → Source: "GitHub Actions".
 name: Publicar en GitHub Pages
 
 on:
@@ -25,6 +26,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true   # crea el sitio de Pages si aún no existe (el repositorio debe ser público en cuentas gratuitas)
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
