@@ -8,7 +8,8 @@
    Imprime una línea OK/FAIL por comprobación, INFO para observaciones, guarda capturas y termina
    con código 1 si algo falla.
    Uso: npm install && node tests/explore.mjs   (necesita Python 3 para el servidor estático).
-   Variables: PORT (por defecto 8347; usa también PORT+1), SHOTS_DIR (carpeta de capturas). */
+   Variables: PORT (por defecto 8347; usa también PORT+1), SHOTS_DIR (carpeta de capturas), ONLY (expresión regular
+   para ejecutar solo los escenarios cuyo nombre coincida, p. ej. ONLY='^23'). */
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, cpSync, readFileSync, writeFileSync, rmSync, utimesSync } from 'node:fs';
@@ -62,7 +63,9 @@ const check = (cond, msg) => { console.log((cond ? 'OK   ' : 'FAIL ') + msg); if
 const info = msg => console.log('INFO ' + msg);
 const consoleErrors = [];
 const openPages = new Set();
+const ONLY = process.env.ONLY ? new RegExp(process.env.ONLY) : null;   // ONLY='^23' node tests/explore.mjs → solo ese escenario
 async function scenario(name, fn) {
+  if (ONLY && !ONLY.test(name)) return;
   currentScenario = name;
   console.log(`\n--- ${name} ---`);
   const t0 = Date.now();
@@ -1347,7 +1350,7 @@ try {
           if (await page.locator('#btn-build-new').isVisible()) await page.click('#btn-build-new');
           await page.click('#build-starts [data-start="0"]'); await page.click('#build-nexts [data-next="agua"]');
         }
-        if (v === 'spell') { await page.click('.key[data-action="clear"]'); await page.click('.key[data-key="H"]'); await page.click('.key[data-action="save"]'); }
+        if (v === 'spell') { await page.click('.key[data-action="clear"]'); await page.click('.key[data-key="H"]'); await page.click('.key[data-action="save"]'); await sleep(350); /* el aviso termina de aparecer (transición 0,2 s) */ }
         if (v === 'pain') { await page.click('#body-map [data-part="pecho"]'); await page.evaluate(() => document.querySelector('#body-map [data-part="cabeza"]').classList.add('scan-hl')); await sleep(400); /* transición de relleno 0,15 s */ }
         if (v === 'history' && (await hist(page)).length === 0) { await show(page, 'yesno'); await page.click('.answer-yes'); await show(page, 'history'); }
         if (v === 'settings') await openAdvanced(page);
