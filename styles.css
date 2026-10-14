@@ -439,6 +439,7 @@ input, textarea, .spell-output, .build-sentence, .hist, #backup-text { -webkit-u
 .body-map g.is-selected .part { fill: var(--no); fill-opacity: 1; }
 .body-map g.is-selected text { fill: var(--on-no); }
 .body-map text { font-family: var(--font); font-size: 13px; font-weight: 700; fill: var(--fg); pointer-events: none; }
+.body-map g.small text { font-size: 10.5px; }
 .body-map g.scan-hl .part, .body-map g.drag-hl .part { fill: var(--focus); fill-opacity: 1; stroke-width: 5; }
 .body-map g.scan-hl text, .body-map g.drag-hl text { fill: #0F1F29; }
 .body-map g.scan-group-hl .part { stroke: var(--focus); stroke-width: 6; stroke-dasharray: 6 4; }
@@ -566,6 +567,7 @@ body.is-scanning.select-screen .views { cursor: pointer; }
   padding: 0.7rem 1.1rem; border-radius: 999px;
   background: var(--fg); color: var(--bg); font-weight: 700; text-align: center;
   box-shadow: var(--shadow); z-index: 50;
+  font-size: clamp(14px, 0.9rem, 20px);
   opacity: 0; visibility: hidden; transition: opacity 0.2s, visibility 0.2s;
 }
 .toast.is-visible { opacity: 1; visibility: visible; }

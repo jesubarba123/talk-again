@@ -890,6 +890,8 @@
         g.setAttribute('aria-label', p.spoken || p.label);
         g.setAttribute('aria-pressed', p.id === painPart ? 'true' : 'false');
         if (p.id === painPart) g.classList.add('is-selected');
+        const small = p.shape === 'ellipse' ? p.rx < 26 : p.w < 50;   // zonas pequeñas: letra más pequeña
+        if (small) g.classList.add('small');
         g.appendChild(svgShape(ns, p, 7, 'hit'));    // zona de toque ampliada (invisible)
         g.appendChild(svgShape(ns, p, 0, 'part'));
         const label = document.createElementNS(ns, 'text');
@@ -1447,7 +1449,7 @@
           const w = reg.installing;
           if (!w) return;
           w.addEventListener('statechange', () => {
-            if (w.state === 'activated' && navigator.serviceWorker.controller) toast('Hay una versión nueva: cierra y vuelve a abrir la app', 6000);
+            if (w.state === 'activated' && navigator.serviceWorker.controller) toast('Versión nueva lista: cierra y vuelve a abrir la app', 5000);
           });
         });
       }).catch(() => { /* no disponible */ });
