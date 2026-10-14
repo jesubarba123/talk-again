@@ -29,7 +29,7 @@
   };
 
   const DEFAULT_SETTINGS = {
-    voiceURI: '', rate: 0.95, scale: '1.2', theme: 'system', keyboardOrder: 'abc', gender: 'm', flashAlert: true,
+    voiceURI: '', rate: 0.95, scale: '1.2', theme: 'dark', keyboardOrder: 'abc', gender: 'm', flashAlert: true,
     scanInterval: 3, scanLoops: 2, scanSelect: 'screen', scanSpeak: true, scanAuto: false,
     cam: false, camSens: 1, camPreview: true,
     touchMode: 'tap', dwellMs: 900, minTouchMs: 0, dragSpeak: true,
