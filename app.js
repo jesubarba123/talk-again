@@ -167,7 +167,7 @@
     say(text, opts) {
       opts = opts || {};
       if (!text) return;
-      if (!this.supported) { toast('Este navegador no tiene voz. Prueben con Chrome, Safari o Edge.'); return; }
+      if (!this.supported) { if (!opts.scan) toast('Este navegador no tiene voz. Prueben con Chrome, Safari o Edge.'); return; }
       try {
         if (opts.scan && this.contentSpeaking) return;   // una etiqueta del barrido nunca corta una frase
         const u = new SpeechSynthesisUtterance(text);
@@ -291,6 +291,7 @@
     if (view === 'history') renderHistory();
     if (view === 'settings') renderSettings();
     touch.release();          // un dedo que sigue apoyado no elige nada en la pantalla nueva
+    touch.apply();
     scanner.refresh();
     try { $('#view-title').focus({ preventScroll: true }); } catch (e) { /* nada */ }
   }
@@ -337,8 +338,10 @@
       this.want = true;
       if (!('wakeLock' in navigator) || this.lock) return;
       try {
-        this.lock = await navigator.wakeLock.request('screen');
-        this.lock.addEventListener('release', () => { this.lock = null; });
+        const lock = await navigator.wakeLock.request('screen');
+        if (!this.want) { try { lock.release(); } catch (e) { /* nada */ } return; }
+        this.lock = lock;
+        lock.addEventListener('release', () => { if (this.lock === lock) this.lock = null; });
       } catch (e) { this.lock = null; }
     },
     release() {
@@ -498,6 +501,7 @@
       this.state = 'running';
       this.loops = 0;
       $('#btn-scan-pause').textContent = '⏸ Pausa';
+      updateWake();
       this.collect();
       if (!this.groups.length || !this.groups[0].length) { this.status('No hay opciones en esta pantalla. Toca para volver al inicio.'); return; }
       this.level = this.groups.length === 1 ? 1 : 0;
@@ -656,9 +660,9 @@
   /* ---------------- Tacto: deslizar para elegir ---------------- */
   const touch = {
     pointerId: null, startAt: 0, lastDuration: 0, current: null, dwellTimer: 0, activating: false, needsLift: false,
-    enabled() { return settings.touchMode !== 'tap' && !scanner.active; },
+    enabled() { return settings.touchMode !== 'tap' && !scanner.active && currentView !== 'settings'; },
     apply() {
-      const on = settings.touchMode !== 'tap' && !scanner.active;
+      const on = settings.touchMode !== 'tap' && !scanner.active && currentView !== 'settings';
       document.body.classList.toggle('touch-drag', on);
       $('#dragbar').hidden = !on;
       document.documentElement.style.setProperty('--dwell-ms', Math.round(settings.dwellMs) + 'ms');
@@ -1000,16 +1004,19 @@
     items.forEach((item, i) => {
       const row = el('div', { class: 'edit-row' });
       row.appendChild(el('input', { class: 'edit-emoji', type: 'text', value: item.e || '', 'aria-label': 'Emoji', 'data-idx': String(i), 'data-field': 'e', maxLength: 8 }));
-      row.appendChild(el('input', { class: 'edit-text', type: 'text', value: gen(item.t || ''), 'aria-label': 'Texto del botón', 'data-idx': String(i), 'data-field': 't', placeholder: 'Texto del botón' }));
+      row.appendChild(el('input', { class: 'edit-text', type: 'text', value: editText(item.t), 'aria-label': 'Texto del botón', 'data-idx': String(i), 'data-field': 't', placeholder: 'Texto del botón' }));
       const tools = el('div', { class: 'edit-tools' });
       tools.appendChild(el('button', { type: 'button', 'data-move': 'up', 'data-idx': String(i), 'aria-label': 'Subir', text: '↑', disabled: i === 0 }));
       tools.appendChild(el('button', { type: 'button', 'data-move': 'down', 'data-idx': String(i), 'aria-label': 'Bajar', text: '↓', disabled: i === items.length - 1 }));
       tools.appendChild(el('button', { type: 'button', 'data-del': String(i), 'aria-label': 'Quitar frase', text: '🗑' }));
       row.appendChild(tools);
-      row.appendChild(el('input', { class: 'edit-say', type: 'text', value: item.s ? gen(item.s) : '', 'aria-label': 'Lo que se dice', 'data-idx': String(i), 'data-field': 's', placeholder: 'Lo que se dice (opcional)' }));
+      row.appendChild(el('input', { class: 'edit-say', type: 'text', value: editText(item.s), 'aria-label': 'Lo que se dice', 'data-idx': String(i), 'data-field': 's', placeholder: 'Lo que se dice (opcional)' }));
       list.appendChild(row);
     });
   }
+  // En el editor, "{o}" se muestra como "o/a" (enojado/a) y al guardar vuelve a ser "{o}".
+  function editText(t) { return String(t || '').replace(/\{o\}/g, 'o/a'); }
+  function storeText(t) { return String(t || '').replace(/o\/a\b/g, '{o}'); }
   function editableItems(catId) {
     if (!Array.isArray(vocab[catId])) vocab[catId] = categoryById(catId).items.map(i => Object.assign({}, i));
     return vocab[catId];
@@ -1125,7 +1132,7 @@
         if (settings.minTouchMs > 0 && touch.lastDuration < settings.minTouchMs * 1000) { e.preventDefault(); e.stopPropagation(); return; }
         // Un doble toque por temblor no repite la frase.
         const now = performance.now();
-        if (lastHit.el === item && now - lastHit.t < 400) { e.preventDefault(); e.stopPropagation(); return; }
+        if (!item.classList.contains('key') && lastHit.el === item && now - lastHit.t < 400) { e.preventDefault(); e.stopPropagation(); return; }
         lastHit = { el: item, t: now };
       }
       if (!scanner.active || !e.isTrusted) return;
@@ -1168,6 +1175,7 @@
       } else {
         try { speechSynthesis.cancel(); speechSynthesis.resume(); } catch (e) { /* nada */ }
         speech.contentSpeaking = false;
+        updateWake();
       }
     });
     // iOS deja la página desplazada al cerrar el teclado.
@@ -1382,7 +1390,8 @@
       const item = items[Number(inp.dataset.idx)];
       if (!item) return;
       const f = inp.dataset.field;
-      if (f === 's') { if (inp.value.trim()) item.s = inp.value; else delete item.s; }
+      if (f === 's') { if (inp.value.trim()) item.s = storeText(inp.value); else delete item.s; }
+      else if (f === 't') item.t = storeText(inp.value);
       else item[f] = inp.value;
       saveVocab();
     });
@@ -1399,7 +1408,8 @@
         [items[i], items[j]] = [items[j], items[i]];
         saveVocab(); renderEditor();
         const btn = $(`#edit-list [data-move="${mv.dataset.move}"][data-idx="${j}"]`);
-        if (btn) btn.focus();
+        const alt = $(`#edit-list .edit-text[data-idx="${j}"]`);
+        if (btn && !btn.disabled) btn.focus(); else if (alt) alt.focus();
       }
     });
     $('#btn-edit-add').addEventListener('click', () => {
@@ -1425,7 +1435,7 @@
     $('#btn-backup-share').addEventListener('click', async () => {
       const t = exportBackup(); $('#backup-text').value = t;
       if (navigator.share) {
-        try { await navigator.share({ title: 'Copia de Talk Again', text: t }); return; } catch (e) { /* cancelado */ }
+        try { await navigator.share({ title: 'Copia de Talk Again', text: t }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
       }
       copyText(t, 'Copia de seguridad copiada (este dispositivo no puede compartir directamente)');
     });
@@ -1482,6 +1492,7 @@
         el('small', { text: settings.scanAuto ? 'Se activará el barrido automático' : 'Se activará la cámara' })
       ]);
       document.body.appendChild(gate);
+      try { gate.focus(); } catch (e) { /* nada */ }
       gate.addEventListener('click', () => {
         gate.remove();
         speech.unlock();

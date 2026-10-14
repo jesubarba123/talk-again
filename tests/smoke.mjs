@@ -69,7 +69,9 @@ try {
   for (const k of ['H', 'O']) await page.click(`.key[data-key="${k}"]`);
   const preds = await page.locator('.pred-btn').allTextContents();
   check(preds.length > 0 && preds.every(w => w.toLowerCase().startsWith('ho')), `Predicciones para "ho": ${preds.join(', ')}`);
-  for (const k of ['L', 'A']) await page.click(`.key[data-key="${k}"]`);
+  for (const k of ['L', 'L']) await page.click(`.key[data-key="${k}"]`);
+  check((await page.locator('#spell-output').innerText()).trim() === 'holl', 'Dos letras iguales seguidas se escriben (ll)');
+  await page.click('.key[data-action="back"]'); await page.click('.key[data-key="A"]');
   await page.click('.key[data-action="space"]');
   await page.click('.key[data-key="Q"]'); await page.click('.key[data-key="U"]'); await page.click('.key[data-key="E"]');
   await page.click('.key[data-key="´"]');
@@ -305,8 +307,9 @@ try {
   }
   await mobile.evaluate(() => window.TalkAgain.show('settings'));
   await mobile.selectOption('#set-scale', '1.6');
-  for (const v of ['home', 'yesno', 'board', 'build', 'spell', 'pain']) {
+  for (const v of ['home', 'yesno', 'board', 'build', 'spell', 'pain', 'history', 'settings']) {
     await mobile.evaluate(view => window.TalkAgain.show(view), v);
+    if (v === 'settings') await mobile.evaluate(() => { document.querySelector('details.advanced').open = true; });
     await mobile.waitForTimeout(150);
     await noOverflow(v + ' con texto enorme');
   }
