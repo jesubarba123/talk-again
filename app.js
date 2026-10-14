@@ -116,7 +116,9 @@
     return node;
   }
   function peopleNames() {
-    return (settings.people || '').split('\n').map(s => s.trim()).filter(Boolean);
+    // "Mi esposa María" → "mi esposa María", para que suene bien dentro de la frase.
+    return (settings.people || '').split('\n').map(s => s.trim()).filter(Boolean)
+      .map(n => (/^mis?\s/i.test(n) ? n[0].toLowerCase() + n.slice(1) : n));
   }
 
   /* ---------------- Voz ---------------- */
@@ -165,7 +167,7 @@
     say(text, opts) {
       opts = opts || {};
       if (!text) return;
-      if (!this.supported) { toast('Este navegador no tiene voz. Usa Chrome, Safari o Edge.'); return; }
+      if (!this.supported) { toast('Este navegador no tiene voz. Prueben con Chrome, Safari o Edge.'); return; }
       try {
         if (opts.scan && this.contentSpeaking) return;   // una etiqueta del barrido nunca corta una frase
         const u = new SpeechSynthesisUtterance(text);
@@ -431,7 +433,7 @@
       this.gi = 0; this.ii = 0; this.loops = 0;
       this.state = 'running';
       $('#btn-scan-pause').textContent = '⏸ Pausa';
-      if (!this.groups.length || !this.groups[0].length) { this.status('Nada que barrer aquí. Toca para volver al inicio.'); return; }
+      if (!this.groups.length || !this.groups[0].length) { this.status('No hay opciones en esta pantalla. Toca para volver al inicio.'); return; }
       this.step();
     },
 
@@ -497,7 +499,7 @@
       this.loops = 0;
       $('#btn-scan-pause').textContent = '⏸ Pausa';
       this.collect();
-      if (!this.groups.length || !this.groups[0].length) { this.status('Nada que barrer aquí. Toca para volver al inicio.'); return; }
+      if (!this.groups.length || !this.groups[0].length) { this.status('No hay opciones en esta pantalla. Toca para volver al inicio.'); return; }
       this.level = this.groups.length === 1 ? 1 : 0;
       this.gi = Math.min(this.gi, this.groups.length - 1);
       this.ii = 0;
@@ -615,8 +617,10 @@
     if (build.mods.length) {
       const q = s.endsWith('?');
       if (q) s = s.slice(0, -1);
-      s += ' ' + build.mods.join(' ');
+      const rest = build.mods.filter(m => m !== 'por favor');
+      if (rest.length) s += ' ' + rest.join(' ');
       if (q) s += '?';
+      if (build.mods.includes('por favor')) s += ', por favor';
     }
     return s.replace(/\ba el\b/g, 'al');
   }
@@ -950,9 +954,9 @@
   }
   function rateLabel(r) {
     r = Number(r);
-    const word = r < 0.85 ? 'Lenta' : r <= 1.05 ? 'Normal' : 'Rápida';
-    return `${word} (${r.toFixed(2).replace('.', ',')})`;
+    return r < 0.75 ? 'Muy lenta' : r < 0.9 ? 'Lenta' : r <= 1.05 ? 'Normal' : r <= 1.2 ? 'Rápida' : 'Muy rápida';
   }
+  function minTouchLabel(v) { v = Number(v); return v > 0 ? v.toFixed(2).replace('.', ',') + ' s' : 'Desactivado'; }
   function sensLabel(v) { v = Number(v); return v < 0.8 ? 'Baja (gestos amplios)' : v > 1.2 ? 'Alta (gestos pequeños)' : 'Media'; }
   function renderSettings() {
     renderVoiceSelect();
@@ -967,7 +971,7 @@
     $('#set-flash').checked = !!settings.flashAlert;
     $('#set-touch-mode').value = settings.touchMode;
     $('#set-dwell').value = settings.dwellMs / 1000; $('#set-dwell-out').textContent = (settings.dwellMs / 1000).toFixed(1).replace('.', ',');
-    $('#set-min-touch').value = settings.minTouchMs; $('#set-min-touch-out').textContent = Number(settings.minTouchMs).toFixed(2).replace('.', ',');
+    $('#set-min-touch').value = settings.minTouchMs; $('#set-min-touch-out').textContent = minTouchLabel(settings.minTouchMs);
     $('#set-drag-speak').checked = !!settings.dragSpeak;
     $('#set-scan-interval').value = settings.scanInterval; $('#set-scan-interval-out').textContent = Number(settings.scanInterval).toFixed(1).replace('.', ',');
     $('#set-scan-loops').value = String(settings.scanLoops);
@@ -1044,7 +1048,7 @@
     $('#cam-status').textContent = msg;
     const note = $('#cam-note');
     if (state === 'face' && extra && note) {
-      note.textContent = `Cara detectada. Inclinación ${extra.pitch > 0 ? '+' : ''}${extra.pitch.toFixed(0)}°, giro ${extra.yaw > 0 ? '+' : ''}${extra.yaw.toFixed(0)}°. Asentir = Sí, negar = No (solo en Sí / No y durante el barrido).`;
+      note.textContent = `Cara detectada. Asentir = Sí, negar = No (solo en Sí / No y durante el barrido). Movimiento arriba/abajo: ${extra.pitch > 0 ? '+' : ''}${extra.pitch.toFixed(0)}°, izquierda/derecha: ${extra.yaw > 0 ? '+' : ''}${extra.yaw.toFixed(0)}°.`;
     }
     if (state === 'error') {
       toast(msg, 6000);
@@ -1340,7 +1344,7 @@
     $('#set-flash').addEventListener('change', e => { settings.flashAlert = e.target.checked; saveSettings(); });
     $('#set-touch-mode').addEventListener('change', e => { settings.touchMode = e.target.value; saveSettings(); applySettings(); });
     $('#set-dwell').addEventListener('input', e => { settings.dwellMs = Math.round(Number(e.target.value) * 1000); $('#set-dwell-out').textContent = (settings.dwellMs / 1000).toFixed(1).replace('.', ','); saveSettings(); applySettings(); });
-    $('#set-min-touch').addEventListener('input', e => { settings.minTouchMs = Number(e.target.value); $('#set-min-touch-out').textContent = settings.minTouchMs.toFixed(2).replace('.', ','); saveSettings(); });
+    $('#set-min-touch').addEventListener('input', e => { settings.minTouchMs = Number(e.target.value); $('#set-min-touch-out').textContent = minTouchLabel(settings.minTouchMs); saveSettings(); });
     $('#set-drag-speak').addEventListener('change', e => { settings.dragSpeak = e.target.checked; saveSettings(); });
     $('#set-scan-interval').addEventListener('input', e => { settings.scanInterval = Number(e.target.value); $('#set-scan-interval-out').textContent = settings.scanInterval.toFixed(1).replace('.', ','); saveSettings(); });
     $('#set-scan-loops').addEventListener('change', e => { settings.scanLoops = Number(e.target.value); saveSettings(); });
@@ -1440,16 +1444,17 @@
     const secure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
     if (!secure) return;
     try {
+      const hadSW = !!navigator.serviceWorker.controller;   // true = ya había una versión instalada
       navigator.serviceWorker.register('sw.js').then(reg => {
         const first = reg.installing;
-        if (first && !navigator.serviceWorker.controller) {
+        if (first && !hadSW) {
           first.addEventListener('statechange', () => { if (first.state === 'activated') toast('Lista para usar sin internet'); });
         }
         reg.addEventListener('updatefound', () => {
           const w = reg.installing;
-          if (!w) return;
+          if (!w || !hadSW) return;
           w.addEventListener('statechange', () => {
-            if (w.state === 'activated' && navigator.serviceWorker.controller) toast('Versión nueva lista: cierra y vuelve a abrir la app', 5000);
+            if (w.state === 'activated') toast('Versión nueva lista: cierra y vuelve a abrir la app', 5000);
           });
         });
       }).catch(() => { /* no disponible */ });

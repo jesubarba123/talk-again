@@ -101,7 +101,7 @@ try {
   hist = await page.evaluate(() => window.TalkAgain.history);
   check(hist[hist.length - 1].text === 'Quiero agua', 'Frase armada "Quiero agua" en el historial');
   await page.click('#build-mods [data-mod="por favor"]');
-  check((await page.locator('#build-sentence').innerText()).trim() === 'Quiero agua por favor', 'Añadido "por favor"');
+  check((await page.locator('#build-sentence').innerText()).trim() === 'Quiero agua, por favor', 'Agregado "por favor" con coma');
   await page.click('#btn-build-save');
   await page.click('#btn-build-new'); await page.click('#build-starts [data-start="0"]');
   check((await page.locator('#build-nexts .tile').first().innerText()).trim() === 'agua', 'La continuación usada sube al principio');
@@ -109,7 +109,7 @@ try {
   await page.click('#build-nexts [data-next="beber?"]'); await page.click('#build-mods [data-mod="ahora"]');
   check((await page.locator('#build-sentence').innerText()).trim() === '¿Puedo beber ahora?', 'Pregunta con añadido conserva el signo');
   await page.click('#btn-home'); await page.click('[data-goto="spell"]');
-  check((await page.locator('.saved-chip').allTextContents()).some(t => t.includes('Quiero agua por favor')), 'Frase guardada desde Armar aparece en Deletrear');
+  check((await page.locator('.saved-chip').allTextContents()).some(t => t.includes('Quiero agua, por favor')), 'Frase guardada desde Armar aparece en Deletrear');
   await page.screenshot({ path: path.join(SHOTS, 'desktop-build.png') });
 
   // Deslizar y soltar
@@ -173,7 +173,7 @@ try {
   check((await page.locator('#board-grid .tile .tile-text').allTextContents()).includes('Estoy enojada'), 'Con "Mujer" las frases cambian a femenino');
   await page.click('[data-cat="personas"]');
   const personas = await page.locator('#board-grid .tile').allTextContents();
-  check(personas.some(t => t.includes('Ver a Mi esposa Ana')) && personas.some(t => t.includes('Llamar a Mi hijo Luis')), 'Cada persona importante crea dos frases');
+  check(personas.some(t => t.includes('Ver a mi esposa Ana')) && personas.some(t => t.includes('Llamar a mi hijo Luis')), 'Cada persona importante crea dos frases (con el nombre en minúscula dentro de la frase)');
   await page.evaluate(() => window.TalkAgain.show('settings'));
   await page.click('#set-gender-m');
 

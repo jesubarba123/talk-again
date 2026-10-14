@@ -1,6 +1,6 @@
 # Guía para la familia: comunicarse con alguien que no puede hablar tras un ACV
 
-Esta guía acompaña a la app **Talk Again**, pero casi todo sirve igual sin tecnología. Está escrita para la familia; "él" se refiere a la persona que no puede hablar (vale igual para "ella"). ACV es el accidente cerebrovascular, también llamado ictus o derrame cerebral.
+Esta guía acompaña a la app **Talk Again**, pero casi todo sirve igual sin tecnología. Está escrita para la familia; «él» se refiere a la persona que no puede hablar (sirve igual para «ella»). ACV es el accidente cerebrovascular, también llamado ictus o derrame cerebral.
 
 > **Antes de nada: no le den agua, comida ni pastillas por la boca hasta que enfermería o fonoaudiología confirme que puede tragar.** Tras un ACV es muy frecuente la disfagia: el líquido puede irse al pulmón sin que tosa ni se note. Si pide agua con la app, avisen a la enfermera en vez de dársela.
 

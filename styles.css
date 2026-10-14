@@ -26,7 +26,7 @@
   --surface-2: #DFE8EE;
   --fg: #0F1F29;
   --muted: #4F6270;
-  --line: #7B8D9A;
+  --line: #62747F;
   --accent: #0A6D96;
   --accent-fg: #FFFFFF;
   --yes: #177A42;
@@ -63,7 +63,7 @@
     --surface-2: #233038;
     --fg: #ECF2F5;
     --muted: #9FB0BA;
-    --line: #5D707C;
+    --line: #8699A6;
     --accent: #4FB4E0;
     --accent-fg: #06202C;
     --yes: #2FBF6C;
@@ -93,7 +93,7 @@
   --surface-2: #233038;
   --fg: #ECF2F5;
   --muted: #9FB0BA;
-  --line: #5D707C;
+  --line: #8699A6;
   --accent: #4FB4E0;
   --accent-fg: #06202C;
   --yes: #2FBF6C;
@@ -292,7 +292,7 @@ input, textarea, .spell-output, .build-sentence, .hist, #backup-text { -webkit-u
 .mode-icon { font-size: 2.2rem; line-height: 1.1; }
 .mode-name { font-size: 1.35rem; font-weight: 700; }
 .mode-desc { color: var(--muted); font-size: 0.95rem; }
-.tile-yesno { background: linear-gradient(135deg, var(--k-action) 0 50%, var(--k-social) 50% 100%); }
+.tile-yesno { background: var(--k-social); }
 .tile-board { background: var(--k-thing); }
 .tile-build { background: var(--k-action); }
 .tile-pain { background: var(--k-health); }
@@ -361,7 +361,7 @@ input, textarea, .spell-output, .build-sentence, .hist, #backup-text { -webkit-u
 .k-thing { background: var(--k-thing); }
 .k-question { background: var(--k-question); }
 .k-health { background: var(--k-health); }
-.tile.is-urgent { border-color: var(--no); border-width: 3px; }
+.tile.is-urgent { border-color: var(--danger); border-width: 3px; }
 .tile.tile-textonly { min-height: 5.2rem; }
 .tile.is-selected { border-color: var(--fg); box-shadow: inset 0 0 0 2px var(--fg); }
 
@@ -372,7 +372,7 @@ input, textarea, .spell-output, .build-sentence, .hist, #backup-text { -webkit-u
   border: 2px solid var(--line); border-radius: 12px; background: var(--surface);
   font-size: 1.5rem; font-weight: 700; overflow-wrap: anywhere;
 }
-.build-sentence:empty::before { content: "Elige cómo empieza la frase…"; color: var(--muted); font-weight: 400; }
+.build-sentence:empty::before { content: "Elige el comienzo…"; color: var(--muted); font-weight: 400; font-size: 1.1rem; }
 .build-step { display: grid; gap: 0.6rem; }
 
 /* ---------- Deletrear ---------- */
@@ -444,7 +444,7 @@ input, textarea, .spell-output, .build-sentence, .hist, #backup-text { -webkit-u
 .body-map g.scan-hl text, .body-map g.drag-hl text { fill: #0F1F29; }
 .body-map g.scan-group-hl .part { stroke: var(--focus); stroke-width: 6; stroke-dasharray: 6 4; }
 .body-map g:focus-visible .part { stroke: var(--focus); stroke-width: 6; }
-.body-map g:focus-visible { outline: none; }
+.body-map g { outline: none; }
 .pain-selected { font-size: 1.15rem; font-weight: 700; text-align: center; min-height: 1.6rem; }
 .pain-scale { display: grid; gap: 0.7rem; align-content: start; }
 .levels { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 4.6rem), 1fr)); gap: 0.6rem; }
@@ -485,7 +485,9 @@ input, textarea, .spell-output, .build-sentence, .hist, #backup-text { -webkit-u
 .subgroup { display: grid; gap: 0.8rem; margin: 0; padding: 0.8rem; border: 2px solid var(--line); border-radius: 12px; min-width: 0; }
 .subgroup legend { padding: 0 0.3rem; font-weight: 700; }
 details.advanced { display: block; }
-details.advanced > summary { cursor: pointer; font-weight: 700; padding: 0.6rem 0.2rem; min-height: 3rem; list-style: none; display: flex; align-items: center; gap: 0.5rem; }
+details.advanced > summary { cursor: pointer; font-weight: 700; padding: 0.6rem 0.2rem; min-height: 3rem; list-style: none; display: flex; align-items: flex-start; gap: 0.5rem; }
+.backup-details > summary { cursor: pointer; font-weight: 700; min-height: 2.5rem; display: flex; align-items: center; }
+.backup-details[open] > summary { margin-bottom: 0.5rem; }
 details.advanced > summary::-webkit-details-marker { display: none; }
 details.advanced > summary::before { content: "▸"; font-size: 1.2rem; }
 details.advanced[open] > summary::before { content: "▾"; }
@@ -506,7 +508,7 @@ details.advanced > .subgroup + .subgroup { margin-top: 0.8rem; }
 .edit-row input { min-height: 3rem; padding: 0.3rem 0.5rem; min-width: 0; width: 100%; border: 2px solid var(--line); border-radius: 10px; background: var(--bg); }
 .edit-row .edit-emoji { text-align: center; font-size: 1.3rem; }
 .edit-row .edit-say { grid-column: 1 / 3; font-size: 0.95rem; }
-.edit-row .edit-tools { display: flex; gap: 0.3rem; grid-row: 1 / 3; align-self: center; }
+.edit-row .edit-tools { display: flex; gap: 0.3rem; grid-column: 3; grid-row: 1 / 3; align-self: center; }
 .edit-row .edit-tools button { min-width: 2.75rem; min-height: 2.75rem; border: 2px solid var(--line); border-radius: 10px; background: var(--surface); }
 
 /* ---------- Barra de barrido ---------- */
@@ -563,8 +565,8 @@ body.is-scanning.select-screen .views { cursor: pointer; }
 .toast {
   position: fixed; left: 50%; bottom: calc(5.5rem + var(--safe-bottom));
   transform: translateX(-50%);
-  max-width: min(92vw, 36rem);
-  padding: 0.7rem 1.1rem; border-radius: 999px;
+  max-width: min(92vw, 30rem);
+  padding: 0.7rem 1.1rem; border-radius: 14px; min-width: 9rem;
   background: var(--fg); color: var(--bg); font-weight: 700; text-align: center;
   box-shadow: var(--shadow); z-index: 50;
   font-size: clamp(14px, 0.9rem, 20px);
@@ -599,6 +601,21 @@ body.is-scanning.select-screen .views { cursor: pointer; }
 
 /* Respuesta visual al activar un botón */
 .is-flash { filter: brightness(1.25) saturate(1.2); }
+
+/* Teléfono: dos columnas en los tableros, chips compactos, tamaños contenidos */
+@media (max-width: 560px) {
+  .mode-grid, .tile-grid, .quick-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mode-tile { min-height: 7.5rem; padding: 0.8rem; min-width: 0; }
+  .mode-icon { font-size: 1.8rem; }
+  .mode-name { font-size: 1.2rem; overflow-wrap: anywhere; }
+  .mode-desc { overflow-wrap: anywhere; }
+  .tile { min-height: 6.5rem; padding: 0.6rem 0.4rem; }
+  .tile-emoji { font-size: 2.1rem; }
+  .tile-text { font-size: 1rem; }
+  .cat-btn { min-height: 3rem; padding: 0.3rem 0.7rem; font-size: 0.95rem; }
+  .cat-btn > span[aria-hidden] { display: none; }
+  .levels { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .flash { animation: none; }
