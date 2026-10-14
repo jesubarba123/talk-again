@@ -15,7 +15,7 @@ const PRECACHE = [
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(VERSION)
-      .then(cache => Promise.allSettled(PRECACHE.map(url => cache.add(url))))
+      .then(cache => Promise.allSettled(PRECACHE.map(url => cache.add(new Request(url, { cache: 'no-cache' })))))
       .then(() => self.skipWaiting())
   );
 });
@@ -46,7 +46,7 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     caches.open(VERSION).then(async cache => {
       const cached = await cache.match(req, { ignoreSearch: true });
-      const network = fetch(req).then(res => {
+      const network = fetch(req.url, { cache: 'no-cache' }).then(res => {
         if (res && res.ok) cache.put(req, res.clone());
         return res;
       }).catch(() => null);

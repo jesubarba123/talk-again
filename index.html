@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Talk Again</title>
 <meta name="description" content="Tablero de comunicación para personas que no pueden hablar tras un ACV (ictus): sí/no, frases con pictogramas, deletreo, dolor y barrido con pulsador o cámara.">
-<meta name="theme-color" content="#0A6D96">
+<meta name="theme-color" content="#1a1446">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Talk Again: para volver a decir lo que necesitas">
 <meta property="og:description" content="App web gratuita, sin internet y sin cuentas, para personas que no pueden hablar tras un ACV (ictus): sí/no, frases con pictogramas, dolor, deletreo y barrido con pulsador o cámara.">
@@ -13,7 +13,7 @@
 <meta property="og:image" content="https://jesubarba123.github.io/talk-again/icons/social.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:locale" content="es_ES">
+<meta property="og:locale" content="es_LA">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Talk Again: para volver a decir lo que necesitas">
 <meta name="twitter:description" content="App web gratuita y sin internet para personas que no pueden hablar tras un ACV (ictus).">
@@ -83,14 +83,14 @@
           <span class="mode-desc">Para el acompañante: voz, tacto, frases</span>
         </button>
       </div>
-      <p class="hint">Si la persona no puede tocar la pantalla, toca <strong>▶ Barrido</strong>: las opciones se iluminan una a una y se elige tocando cualquier parte de la pantalla, con un pulsador (switch) o asintiendo frente a la cámara. Si la mano tiembla, en Ajustes → Tacto está "deslizar para elegir".</p>
+      <p class="hint">Si la persona no puede tocar la pantalla, toquen <strong>▶ Barrido</strong>: las opciones se iluminan una a una y se elige tocando cualquier parte de la pantalla, con un pulsador (switch) o asintiendo frente a la cámara. Si la mano tiembla, en Ajustes → Tacto está «deslizar para elegir».</p>
     </section>
 
     <!-- SÍ / NO -->
     <section id="view-yesno" class="view view-yesno" data-title="Sí / No" hidden>
       <div class="question-row">
         <label for="question-input" class="sr-only">Pregunta</label>
-        <input id="question-input" type="text" autocomplete="off" enterkeyhint="done" placeholder="Escribe la pregunta (opcional) para guardarla con la respuesta">
+        <input id="question-input" type="text" autocomplete="off" enterkeyhint="done" placeholder="Pregunta (opcional): se guarda con la respuesta">
         <button id="btn-ask" class="btn" type="button" title="Leer la pregunta en voz alta">🔊 Leer</button>
       </div>
       <div class="yesno-grid">
@@ -104,7 +104,7 @@
       <div class="yesno-row">
         <button class="answer answer-maybe" type="button" data-scan data-label="No sé" data-answer="No sé" data-say="No sé"><span aria-hidden="true">🤷 </span>NO SÉ</button>
         <button class="answer answer-neutral" type="button" data-scan data-label="Más o menos" data-answer="Más o menos" data-say="Más o menos"><span aria-hidden="true">👌 </span>MÁS O MENOS</button>
-        <button class="answer answer-neutral" type="button" data-scan data-label="Repite" data-answer="Repite la pregunta" data-say="Repitan la pregunta, por favor"><span aria-hidden="true">🔁 </span>REPITE</button>
+        <button class="answer answer-neutral" type="button" data-scan data-label="Repitan" data-answer="Repitan la pregunta" data-say="Repitan la pregunta, por favor"><span aria-hidden="true">🔁 </span>REPITAN</button>
       </div>
       <p class="hint">Hagan preguntas que se contesten con sí o no, de una en una. Con la cámara activada, <strong>asentir = SÍ</strong> y <strong>negar con la cabeza = NO</strong>. Teclas: ← Sí, → No, ↓ No sé.</p>
     </section>
@@ -132,10 +132,10 @@
       </div>
       <div id="build-step-3" class="build-step" hidden>
         <h2 class="section-title">3. Agrega algo (opcional)</h2>
-        <div id="build-mods" class="quick-row" role="group" aria-label="Añadidos"></div>
+        <div id="build-mods" class="quick-row" role="group" aria-label="Agregados"></div>
         <div class="toolbar">
           <button id="btn-build-save" class="btn" type="button" data-scan data-label="Guardar en frases">💾 Guardar en frases</button>
-          <button id="btn-build-new" class="btn btn-accent" type="button" data-scan data-label="Otra frase">🆕 Otra frase</button>
+          <button id="btn-build-new" class="btn btn-accent" type="button" data-scan data-label="Otra frase">➕ Otra frase</button>
         </div>
       </div>
       <p class="hint">Las continuaciones que más se usan van subiendo solas al principio.</p>
@@ -220,7 +220,7 @@
             <label for="set-scale">Tamaño del texto</label>
             <select id="set-scale">
               <option value="1">Normal</option>
-              <option value="1.2">Grande (recomendado en tablet)</option>
+              <option value="1.2">Grande (recomendado)</option>
               <option value="1.4">Muy grande</option>
               <option value="1.6">Enorme</option>
             </select>
@@ -228,9 +228,9 @@
           <div class="field">
             <label for="set-theme">Tema</label>
             <select id="set-theme">
+              <option value="dark">Cristal oscuro (recomendado)</option>
+              <option value="light">Cristal claro</option>
               <option value="system">Como el dispositivo</option>
-              <option value="light">Claro</option>
-              <option value="dark">Oscuro</option>
             </select>
           </div>
         </fieldset>
@@ -240,18 +240,20 @@
           <div class="field">
             <span class="field-label" id="gender-label">Las frases hablan como…</span>
             <div class="seg" role="radiogroup" aria-labelledby="gender-label">
-              <button id="set-gender-m" class="seg-btn is-active" type="button" data-gender="m" role="radio" aria-checked="true">Hombre (cansado)</button>
-              <button id="set-gender-f" class="seg-btn" type="button" data-gender="f" role="radio" aria-checked="false">Mujer (cansada)</button>
+              <button id="set-gender-m" class="seg-btn is-active" type="button" data-gender="m" role="radio" aria-checked="true">Hombre</button>
+              <button id="set-gender-f" class="seg-btn" type="button" data-gender="f" role="radio" aria-checked="false">Mujer</button>
             </div>
+            <small class="note">Cambia las frases con adjetivo: «estoy cansado» o «estoy cansada».</small>
           </div>
           <div class="field">
             <label for="set-people">Personas importantes: un nombre por línea. Cada uno crea dos frases: «Quiero ver a …» y «Llamen a …».</label>
-            <textarea id="set-people" rows="4" placeholder="Mi esposa María&#10;Mi hijo Pablo&#10;Mi hermano"></textarea>
+            <textarea id="set-people" rows="4" placeholder="mi esposa María&#10;mi hijo Pablo&#10;mi hermano Luis"></textarea>
           </div>
         </fieldset>
 
         <fieldset class="group">
-          <legend>Tacto (si la mano tiembla o no es precisa)</legend>
+          <legend>Tacto</legend>
+          <small class="note">Para cuando la mano tiembla o no es precisa.</small>
           <div class="field">
             <label for="set-touch-mode">Cómo se elige con el dedo</label>
             <select id="set-touch-mode">
@@ -266,9 +268,9 @@
             <input id="set-dwell" type="range" min="0.4" max="2.5" step="0.1" value="0.9">
           </div>
           <div class="field">
-            <label for="set-min-touch">Ignorar toques más cortos de: <output id="set-min-touch-out">0,00</output> s</label>
+            <label for="set-min-touch">Ignorar toques más cortos de: <output id="set-min-touch-out">Desactivado</output></label>
             <input id="set-min-touch" type="range" min="0" max="0.8" step="0.05" value="0">
-            <small class="note">Evita que un roce accidental elija algo. Vale también para el modo normal.</small>
+            <small class="note">Evita que un roce accidental elija algo. Sirve también para el modo normal.</small>
           </div>
           <div class="field field-check">
             <input id="set-drag-speak" type="checkbox" checked>
@@ -287,14 +289,15 @@
             <button id="btn-edit-add" class="btn" type="button">➕ Agregar frase</button>
             <button id="btn-edit-restore" class="btn" type="button">↩ Restaurar esta categoría</button>
           </div>
-          <small class="note">«Lo que se dice» es opcional: si se deja vacío, se lee el texto del botón.</small>
+          <small class="note">«Lo que se dice» es opcional: si se deja vacío, se lee el texto del botón. Donde aparece «o/a» (enojado/a) se usa la terminación de Hombre o Mujer.</small>
         </fieldset>
 
         <details class="group advanced">
-          <summary>Ajustes avanzados: barrido, cámara, teclado, copia de seguridad</summary>
+          <summary>Ajustes avanzados</summary>
 
           <fieldset class="subgroup">
-            <legend>Barrido automático (para quien no puede tocar la pantalla)</legend>
+            <legend>Barrido automático</legend>
+            <small class="note">Para quien no puede tocar la pantalla.</small>
             <div class="field">
               <label for="set-scan-interval">Tiempo por opción: <output id="set-scan-interval-out">3,0</output> s</label>
               <input id="set-scan-interval" type="range" min="0.8" max="8" step="0.1" value="3">
@@ -311,10 +314,10 @@
             <div class="field">
               <label for="set-scan-select">Cómo se elige la opción iluminada</label>
               <select id="set-scan-select">
-                <option value="screen">Tocando cualquier parte de la pantalla, pulsador o tecla</option>
-                <option value="button">Solo con el botón SELECCIONAR, pulsador o tecla</option>
+                <option value="screen">Tocar la pantalla, pulsador o tecla</option>
+                <option value="button">Solo botón SELECCIONAR, pulsador o tecla</option>
               </select>
-              <small class="note">Los pulsadores (switch) Bluetooth suelen enviar la tecla Espacio o Enter (Intro); ambas seleccionan. Flechas → y ← avanzan o retroceden. Si usan el Control por botón de iPad o el Acceso con interruptores de Android, dejen el barrido de la app apagado: ya lo hace el sistema.</small>
+              <small class="note">Los pulsadores (switch) Bluetooth suelen enviar la tecla Espacio o Enter; ambas seleccionan. Flechas → y ← avanzan o retroceden. Si usan el Control por botón de iPad o el Acceso con interruptores de Android, dejen el barrido de la app apagado: ya lo hace el sistema.</small>
             </div>
             <div class="field field-check">
               <input id="set-scan-speak" type="checkbox" checked>
@@ -327,7 +330,8 @@
           </fieldset>
 
           <fieldset class="subgroup">
-            <legend>Cámara: asentir y negar con la cabeza (experimental)</legend>
+            <legend>Cámara (experimental)</legend>
+            <small class="note">Asentir y negar con la cabeza frente a la cámara frontal.</small>
             <div class="field field-check">
               <input id="set-cam" type="checkbox">
               <label for="set-cam">Detectar gestos de cabeza con la cámara frontal</label>
@@ -363,15 +367,19 @@
 
           <fieldset class="subgroup">
             <legend>Copia de seguridad</legend>
-            <div class="field">
-              <label for="backup-text">Guarden este texto (por ejemplo, envíenselo por WhatsApp). Pegándolo en otra tablet se recupera todo: ajustes, frases y palabras aprendidas.</label>
-              <textarea id="backup-text" rows="4" spellcheck="false"></textarea>
-            </div>
+            <p class="note">Guarden el texto de la copia (por ejemplo, envíenselo por WhatsApp). Pegándolo en otra tablet se recupera todo: ajustes, frases y palabras aprendidas.</p>
             <div class="toolbar">
-              <button id="btn-backup-copy" class="btn" type="button">📋 Copiar copia</button>
+              <button id="btn-backup-copy" class="btn" type="button">📋 Copiar el texto</button>
               <button id="btn-backup-share" class="btn" type="button">📤 Compartir</button>
               <button id="btn-backup-restore" class="btn" type="button">📥 Restaurar desde el texto</button>
             </div>
+            <details class="backup-details">
+              <summary>Ver o pegar el texto de la copia</summary>
+              <div class="field">
+                <label for="backup-text" class="sr-only">Texto de la copia de seguridad</label>
+                <textarea id="backup-text" rows="4" spellcheck="false"></textarea>
+              </div>
+            </details>
           </fieldset>
 
           <fieldset class="subgroup">

@@ -22,7 +22,7 @@ window.TA_DATA = {
         { e: "❌", t: "Eso no", s: "No, no es eso" },
         { e: "🙏", t: "Gracias" },
         { e: "🙂", t: "Estoy bien" },
-        { e: "🤲", t: "Quédate conmigo", s: "Quédate conmigo un rato, por favor" },
+        { e: "🤝", t: "Quédate conmigo", s: "Quédate conmigo un rato, por favor" },
         { e: "🚪", t: "Quiero estar sol{o}", s: "Quiero estar sol{o} un rato" },
         { e: "💤", t: "Déjenme descansar", s: "Déjenme descansar, por favor" },
         { e: "✍️", t: "Escríbanlo", s: "Escríbanlo, por favor, lo leo mejor" },
@@ -33,19 +33,19 @@ window.TA_DATA = {
       ]
     },
     {
-      id: "necesidades", name: "Necesidades", emoji: "🧴", k: "k-action",
+      id: "necesidades", name: "Necesidades", emoji: "🙋", k: "k-action",
       items: [
         { e: "🤕", t: "Tengo dolor", urgent: true },
-        { e: "😮‍💨", t: "No respiro bien", s: "No puedo respirar bien", urgent: true },
+        { e: "🫁", t: "No respiro bien", s: "No puedo respirar bien", urgent: true },
         { e: "🚻", t: "Quiero ir al baño", urgent: true },
-        { e: "🚽", t: "Orinar", s: "Necesito orinar" },
-        { e: "🚽", t: "Evacuar", s: "Necesito evacuar" },
+        { e: "🚽💧", t: "Orinar", s: "Necesito orinar" },
+        { e: "🚽🧻", t: "Evacuar", s: "Necesito evacuar" },
         { e: "🤢", t: "Tengo náuseas", urgent: true },
         { e: "😵‍💫", t: "Estoy maread{o}" },
         { e: "💧", t: "Tengo sed" },
         { e: "🍽️", t: "Tengo hambre" },
         { e: "🙅", t: "Ya no quiero más", s: "Ya no quiero más, gracias" },
-        { e: "🔄", t: "Cambiar de posición", s: "Quiero cambiar de posición" },
+        { e: "🔁", t: "Cambiar de posición", s: "Quiero cambiar de posición" },
         { e: "🛏️", t: "Acomodarme", s: "Estoy incómod{o}, acomódenme la almohada o la cama, por favor" },
         { e: "💦", t: "Estoy mojad{o}", s: "Estoy mojad{o}, necesito que me cambien", urgent: true },
         { e: "🥶", t: "Tengo frío" },
@@ -58,10 +58,12 @@ window.TA_DATA = {
         { e: "🧻", t: "Que me limpien", s: "Necesito que me limpien" },
         { e: "🚿", t: "Quiero bañarme" },
         { e: "🪥", t: "Lavarme los dientes", s: "Quiero lavarme los dientes" },
-        { e: "🩹", t: "Me molesta algo", s: "Me molesta algo en el cuerpo" },
+        { e: "😖", t: "Me molesta algo", s: "Me molesta algo en el cuerpo" },
         { e: "🔇", t: "Menos ruido", s: "Hay mucho ruido, por favor bajen el volumen" },
-        { e: "💡", t: "Luz", s: "Quiero más luz o menos luz, por favor" },
-        { e: "🪟", t: "Ventana", s: "Quiero abrir o cerrar la ventana" }
+        { e: "💡", t: "Más luz", s: "Quiero más luz, por favor" },
+        { e: "🌙", t: "Menos luz", s: "Quiero menos luz, por favor" },
+        { e: "🪟", t: "Abrir la ventana", s: "Quiero que abran la ventana" },
+        { e: "🚪", t: "Cerrar la ventana", s: "Quiero que cierren la ventana" }
       ]
     },
     {
@@ -71,7 +73,7 @@ window.TA_DATA = {
         { e: "😢", t: "Estoy triste" },
         { e: "😠", t: "Estoy enojad{o}" },
         { e: "😨", t: "Tengo miedo" },
-        { e: "😰", t: "Estoy nervios{o}", s: "Estoy nervios{o}, ansios{o}" },
+        { e: "😰", t: "Estoy nervios{o}", s: "Estoy nervios{o} y ansios{o}" },
         { e: "😤", t: "Estoy frustrad{o}", s: "Estoy frustrad{o}, no me entienden" },
         { e: "😩", t: "Estoy cansad{o}" },
         { e: "😟", t: "Estoy preocupad{o}" },
@@ -90,9 +92,9 @@ window.TA_DATA = {
       items: [
         { e: "👩‍⚕️", t: "Enfermera", s: "Llamen a la enfermera, por favor" },
         { e: "🩺", t: "Médico", s: "Quiero hablar con el médico" },
-        { e: "🗣️", t: "Fonoaudiólogo", s: "Quiero ver al fonoaudiólogo o logopeda" },
-        { e: "🦵", t: "Kinesiólogo", s: "Quiero ver al kinesiólogo o fisioterapeuta" },
-        { e: "👨‍👩‍👧", t: "Mi familia", s: "Quiero ver a mi familia" },
+        { e: "🗣️", t: "Fonoaudiólogo", s: "Quiero ver al fonoaudiólogo" },
+        { e: "🦵", t: "Kinesiólogo", s: "Quiero ver al kinesiólogo" },
+        { e: "👪", t: "Mi familia", s: "Quiero ver a mi familia" },
         { e: "📞", t: "Llamar a alguien", s: "Quiero llamar a alguien por teléfono" },
         { e: "❓", t: "¿Quién es usted?", s: "Perdón, ¿quién es usted?" }
       ]
@@ -106,7 +108,7 @@ window.TA_DATA = {
         { e: "📖", t: "Que me lean", s: "Quiero que me lean algo" },
         { e: "📱", t: "Mi teléfono", s: "Quiero mi teléfono" },
         { e: "🌳", t: "Salir afuera", s: "Quiero salir afuera un rato" },
-        { e: "🙏", t: "Rezar", s: "Quiero rezar" },
+        { e: "📿", t: "Rezar", s: "Quiero rezar" },
         { e: "🖼️", t: "Ver fotos", s: "Quiero ver fotos" },
         { e: "✍️", t: "Escribir", s: "Quiero intentar escribir" },
         { e: "🚶", t: "Caminar", s: "Quiero intentar caminar o moverme" },
@@ -138,7 +140,7 @@ window.TA_DATA = {
         { e: "🛎️", t: "Llamen a la enfermera", s: "Llamen a la enfermera, por favor", urgent: true },
         { e: "😵", t: "Me siento peor", s: "Me siento peor que antes", urgent: true },
         { e: "💊", t: "Algo para el dolor", s: "Necesito algo para el dolor", urgent: true },
-        { e: "🫁", t: "Me atraganto", s: "Me atraganto al tragar, cuidado con la comida y el agua", urgent: true },
+        { e: "🥤", t: "Me atraganto", s: "Me atraganto al tragar, cuidado con la comida y el agua", urgent: true },
         { e: "⚠️", t: "Me voy a caer", s: "Me voy a caer, sujétenme", urgent: true },
         { e: "🤒", t: "Tengo fiebre", s: "Creo que tengo fiebre" },
         { e: "💉", t: "Me duele la vía", s: "Me duele donde tengo la vía o el suero" },
@@ -173,11 +175,11 @@ window.TA_DATA = {
 
   /* Frases rápidas del modo Dolor */
   painQuick: [
-    { e: "🆕", t: "Es un dolor nuevo" },
+    { e: "❗", t: "Es un dolor nuevo" },
     { e: "📈", t: "Está empeorando", s: "El dolor está empeorando" },
     { e: "📉", t: "Está mejorando", s: "El dolor está mejorando" },
     { e: "💊", t: "Quiero algo para el dolor", urgent: true },
-    { e: "➖", t: "Es constante", s: "El dolor es constante, no se va" },
+    { e: "⏳", t: "Es constante", s: "El dolor es constante, no se va" },
     { e: "⏱️", t: "Va y viene", s: "El dolor va y viene" },
     { e: "⚡", t: "Es punzante", s: "El dolor es punzante, como pinchazos" },
     { e: "🔥", t: "Quema", s: "El dolor quema" },
@@ -195,8 +197,8 @@ window.TA_DATA = {
     front: [
       { id: "cabeza", label: "Cabeza", say: "Me duele la cabeza", shape: "ellipse", cx: 100, cy: 42, rx: 32, ry: 36 },
       { id: "cuello", label: "Cuello", spoken: "Cuello o garganta", say: "Me duele el cuello o la garganta", shape: "rect", x: 78, y: 80, w: 44, h: 24, r: 8 },
-      { id: "hombro_der", label: "Hombro", spoken: "Hombro derecho", say: "Me duele el hombro derecho", shape: "ellipse", cx: 40, cy: 112, rx: 22, ry: 15 },
-      { id: "hombro_izq", label: "Hombro", spoken: "Hombro izquierdo", say: "Me duele el hombro izquierdo", shape: "ellipse", cx: 160, cy: 112, rx: 22, ry: 15 },
+      { id: "hombro_der", label: "Hombro", spoken: "Hombro derecho", say: "Me duele el hombro derecho", shape: "ellipse", cx: 37, cy: 112, rx: 24, ry: 15 },
+      { id: "hombro_izq", label: "Hombro", spoken: "Hombro izquierdo", say: "Me duele el hombro izquierdo", shape: "ellipse", cx: 163, cy: 112, rx: 24, ry: 15 },
       { id: "pecho", label: "Pecho", say: "Me duele el pecho", shape: "rect", x: 58, y: 106, w: 84, h: 62, r: 16 },
       { id: "estomago", label: "Estómago", say: "Me duele el estómago", shape: "rect", x: 60, y: 170, w: 80, h: 56, r: 12 },
       { id: "pelvis", label: "Bajo vientre", spoken: "Bajo vientre", say: "Me duele el bajo vientre", shape: "rect", x: 60, y: 228, w: 80, h: 38, r: 12 },
@@ -212,8 +214,8 @@ window.TA_DATA = {
     back: [
       { id: "nuca", label: "Nuca", say: "Me duele la nuca", shape: "ellipse", cx: 100, cy: 42, rx: 32, ry: 36 },
       { id: "cuello_atras", label: "Cuello", spoken: "Cuello por detrás", say: "Me duele el cuello por detrás", shape: "rect", x: 78, y: 80, w: 44, h: 24, r: 8 },
-      { id: "hombro_izq_atras", label: "Hombro", spoken: "Hombro izquierdo", say: "Me duele el hombro izquierdo por detrás", shape: "ellipse", cx: 40, cy: 112, rx: 22, ry: 15 },
-      { id: "hombro_der_atras", label: "Hombro", spoken: "Hombro derecho", say: "Me duele el hombro derecho por detrás", shape: "ellipse", cx: 160, cy: 112, rx: 22, ry: 15 },
+      { id: "hombro_izq_atras", label: "Hombro", spoken: "Hombro izquierdo", say: "Me duele el hombro izquierdo por detrás", shape: "ellipse", cx: 37, cy: 112, rx: 24, ry: 15 },
+      { id: "hombro_der_atras", label: "Hombro", spoken: "Hombro derecho", say: "Me duele el hombro derecho por detrás", shape: "ellipse", cx: 163, cy: 112, rx: 24, ry: 15 },
       { id: "espalda_alta", label: "Espalda alta", spoken: "Espalda alta", say: "Me duele la espalda, en la parte alta", shape: "rect", x: 58, y: 106, w: 84, h: 62, r: 16 },
       { id: "espalda_baja", label: "Espalda baja", spoken: "Espalda baja", say: "Me duele la espalda, en la parte baja", shape: "rect", x: 60, y: 170, w: 80, h: 56, r: 12 },
       { id: "gluteos", label: "Glúteos", say: "Me duelen los glúteos o el coxis", shape: "rect", x: 60, y: 228, w: 80, h: 38, r: 12 },
@@ -260,8 +262,8 @@ window.TA_DATA = {
     "nieto nieta amigo amiga vecino " +
     "frío calor sed hambre miedo triste alegre contento cansado nervioso tranquilo solo acompañado " +
     "televisión tele música radio teléfono celular llamar ventana luz puerta silla almohada manta frazada sábana " +
-    "ropa lentes anteojos audífono dientes cepillo jabón toalla pañal orinar pis defecar vomitar toser respirar " +
-    "quizás tal vez claro vale perdón lo siento te quiero " +
+    "ropa lentes anteojos audífono dientes cepillo jabón toalla pañal orinar pipí defecar vomitar toser respirar cobija " +
+    "quizás tal vez claro perdón lo siento te quiero " +
     "cuándo dónde cómo quién cuánto por qué " +
     "día semana mes año hora minuto rato tiempo noche " +
     "hablar decir escuchar ver mirar leer escribir pensar recordar olvidar entender saber " +

@@ -69,7 +69,9 @@ try {
   for (const k of ['H', 'O']) await page.click(`.key[data-key="${k}"]`);
   const preds = await page.locator('.pred-btn').allTextContents();
   check(preds.length > 0 && preds.every(w => w.toLowerCase().startsWith('ho')), `Predicciones para "ho": ${preds.join(', ')}`);
-  for (const k of ['L', 'A']) await page.click(`.key[data-key="${k}"]`);
+  for (const k of ['L', 'L']) await page.click(`.key[data-key="${k}"]`);
+  check((await page.locator('#spell-output').innerText()).trim() === 'holl', 'Dos letras iguales seguidas se escriben (ll)');
+  await page.click('.key[data-action="back"]'); await page.click('.key[data-key="A"]');
   await page.click('.key[data-action="space"]');
   await page.click('.key[data-key="Q"]'); await page.click('.key[data-key="U"]'); await page.click('.key[data-key="E"]');
   await page.click('.key[data-key="´"]');
@@ -101,7 +103,7 @@ try {
   hist = await page.evaluate(() => window.TalkAgain.history);
   check(hist[hist.length - 1].text === 'Quiero agua', 'Frase armada "Quiero agua" en el historial');
   await page.click('#build-mods [data-mod="por favor"]');
-  check((await page.locator('#build-sentence').innerText()).trim() === 'Quiero agua por favor', 'Añadido "por favor"');
+  check((await page.locator('#build-sentence').innerText()).trim() === 'Quiero agua, por favor', 'Agregado "por favor" con coma');
   await page.click('#btn-build-save');
   await page.click('#btn-build-new'); await page.click('#build-starts [data-start="0"]');
   check((await page.locator('#build-nexts .tile').first().innerText()).trim() === 'agua', 'La continuación usada sube al principio');
@@ -109,7 +111,7 @@ try {
   await page.click('#build-nexts [data-next="beber?"]'); await page.click('#build-mods [data-mod="ahora"]');
   check((await page.locator('#build-sentence').innerText()).trim() === '¿Puedo beber ahora?', 'Pregunta con añadido conserva el signo');
   await page.click('#btn-home'); await page.click('[data-goto="spell"]');
-  check((await page.locator('.saved-chip').allTextContents()).some(t => t.includes('Quiero agua por favor')), 'Frase guardada desde Armar aparece en Deletrear');
+  check((await page.locator('.saved-chip').allTextContents()).some(t => t.includes('Quiero agua, por favor')), 'Frase guardada desde Armar aparece en Deletrear');
   await page.screenshot({ path: path.join(SHOTS, 'desktop-build.png') });
 
   // Deslizar y soltar
@@ -173,7 +175,7 @@ try {
   check((await page.locator('#board-grid .tile .tile-text').allTextContents()).includes('Estoy enojada'), 'Con "Mujer" las frases cambian a femenino');
   await page.click('[data-cat="personas"]');
   const personas = await page.locator('#board-grid .tile').allTextContents();
-  check(personas.some(t => t.includes('Ver a Mi esposa Ana')) && personas.some(t => t.includes('Llamar a Mi hijo Luis')), 'Cada persona importante crea dos frases');
+  check(personas.some(t => t.includes('Ver a mi esposa Ana')) && personas.some(t => t.includes('Llamar a mi hijo Luis')), 'Cada persona importante crea dos frases (con el nombre en minúscula dentro de la frase)');
   await page.evaluate(() => window.TalkAgain.show('settings'));
   await page.click('#set-gender-m');
 
@@ -305,8 +307,9 @@ try {
   }
   await mobile.evaluate(() => window.TalkAgain.show('settings'));
   await mobile.selectOption('#set-scale', '1.6');
-  for (const v of ['home', 'yesno', 'board', 'build', 'spell', 'pain']) {
+  for (const v of ['home', 'yesno', 'board', 'build', 'spell', 'pain', 'history', 'settings']) {
     await mobile.evaluate(view => window.TalkAgain.show(view), v);
+    if (v === 'settings') await mobile.evaluate(() => { document.querySelector('details.advanced').open = true; });
     await mobile.waitForTimeout(150);
     await noOverflow(v + ' con texto enorme');
   }

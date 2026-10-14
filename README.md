@@ -2,7 +2,11 @@
 
 Tablero de comunicación para una persona que **perdió el habla tras un ACV** (accidente cerebrovascular, también llamado ictus o derrame cerebral) pero entiende lo que se le dice y puede responder con la cabeza, con la mano o con la mirada. Pensado para usarse en la cama del hospital o en casa, en una tablet o un teléfono, por la propia persona o con ayuda de un acompañante.
 
-Es una página web sin servidor: no hay cuentas, no se envía nada a internet y funciona sin conexión una vez instalada. Todo lo que se dice queda guardado en el dispositivo para mostrárselo al personal sanitario.
+**Pruébala:** https://jesubarba123.github.io/talk-again/
+
+![Tablero de frases de Talk Again](docs/captura.png)
+
+Es una página web sin servidor: no hay cuentas, no se envía nada a internet y funciona sin conexión una vez instalada. Todo lo que se dice queda guardado en el dispositivo para mostrárselo al personal de salud.
 
 > **Importante: no le den agua, comida ni pastillas por la boca hasta que enfermería o fonoaudiología confirme que puede tragar.** Tras un ACV es muy frecuente la disfagia: el líquido puede irse al pulmón sin que tosa. Si la persona pide agua con la app, avisen a la enfermera.
 
@@ -25,7 +29,7 @@ Ajustes: voz en español y velocidad, tamaño del texto hasta «enorme», tema c
 
 ## Probar ahora
 
-1. **Sin instalar nada:** cuando GitHub Pages esté activado (ver abajo), la app vive en `https://jesubarba123.github.io/talk-again/`.
+1. **Sin instalar nada:** abran https://jesubarba123.github.io/talk-again/ en el navegador de la tablet o el teléfono.
 2. **En local:** descarguen el repositorio y abran `index.html` en Chrome, Edge o Safari. O ejecuten `npm start` y entren en `http://localhost:8080`.
 3. **Instalar en la tablet o el teléfono** (ocupa toda la pantalla y funciona sin internet):
    - Android / Chrome: menú ⋮ → **Agregar a pantalla de inicio** (o «Instalar aplicación»).
@@ -89,7 +93,7 @@ npm start            # servidor local en http://localhost:8080
 
 Los pictogramas son emojis del propio dispositivo, así no hay que descargar imágenes. Si quieren pictogramas más claros, una mejora natural es usar los de [ARASAAC](https://arasaac.org/) (gratuitos para uso no comercial).
 
-## Apps ya existentes que merece la pena probar
+## Apps ya existentes que vale la pena probar
 
 Antes o además de esta app, conviene probar lo que ya existe; un fonoaudiólogo (logopeda) puede ayudar a elegir según cómo estén la comprensión, la lectura y la movilidad de la persona.
 
