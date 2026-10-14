@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Talk Again</title>
+<meta name="description" content="Tablero de comunicación para personas que no pueden hablar tras un ictus: sí/no, frases con pictogramas, deletreo, dolor y barrido con pulsador o cámara.">
+<meta name="theme-color" content="#0A6D96">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Talk Again">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app" class="app">
+
+  <header class="topbar">
+    <button id="btn-home" class="icon-btn" type="button" aria-label="Inicio" title="Inicio">🏠</button>
+    <h1 id="view-title" class="view-title">Talk Again</h1>
+    <button id="btn-scan" class="scan-toggle" type="button" aria-pressed="false" title="Activar o detener el barrido automático">▶ Barrido</button>
+    <button id="btn-help" class="help-btn" type="button" title="Pedir ayuda con sonido fuerte">🆘 AYUDA</button>
+    <button id="btn-settings" class="icon-btn" type="button" aria-label="Ajustes" title="Ajustes">⚙️</button>
+  </header>
+
+  <main id="views" class="views">
+
+    <!-- INICIO -->
+    <section id="view-home" class="view view-home" data-title="Talk Again">
+      <p class="lead">Elige cómo quieres comunicarte. Todo lo que se diga queda guardado en el <strong>Historial</strong>.</p>
+      <div class="mode-grid">
+        <button class="mode-tile tile-yesno" type="button" data-scan data-label="Sí o No" data-goto="yesno">
+          <span class="mode-icon">👍👎</span>
+          <span class="mode-name">Sí / No</span>
+          <span class="mode-desc">Responder preguntas</span>
+        </button>
+        <button class="mode-tile tile-board" type="button" data-scan data-label="Frases" data-goto="board">
+          <span class="mode-icon">🗣️</span>
+          <span class="mode-name">Frases</span>
+          <span class="mode-desc">Necesidades, sentimientos, personas</span>
+        </button>
+        <button class="mode-tile tile-pain" type="button" data-scan data-label="Dolor" data-goto="pain">
+          <span class="mode-icon">🤕</span>
+          <span class="mode-name">Dolor</span>
+          <span class="mode-desc">Dónde y cuánto duele</span>
+        </button>
+        <button class="mode-tile tile-spell" type="button" data-scan data-label="Deletrear" data-goto="spell">
+          <span class="mode-icon">🔤</span>
+          <span class="mode-name">Deletrear</span>
+          <span class="mode-desc">Escribir letra a letra</span>
+        </button>
+        <button class="mode-tile tile-history" type="button" data-scan data-label="Historial" data-goto="history">
+          <span class="mode-icon">📋</span>
+          <span class="mode-name">Historial</span>
+          <span class="mode-desc">Lo que se ha dicho hoy</span>
+        </button>
+        <button class="mode-tile tile-settings" type="button" data-scan data-label="Ajustes" data-goto="settings">
+          <span class="mode-icon">⚙️</span>
+          <span class="mode-name">Ajustes</span>
+          <span class="mode-desc">Voz, barrido, cámara, frases</span>
+        </button>
+      </div>
+      <p class="hint">Si la persona no puede tocar la pantalla, pulsa <strong>▶ Barrido</strong>: las opciones se iluminan una a una y se elige tocando cualquier parte de la pantalla, con un pulsador o asintiendo frente a la cámara.</p>
+    </section>
+
+    <!-- SÍ / NO -->
+    <section id="view-yesno" class="view view-yesno" data-title="Sí / No" hidden>
+      <div class="question-row">
+        <label for="question-input" class="sr-only">Pregunta</label>
+        <input id="question-input" type="text" autocomplete="off" enterkeyhint="done" placeholder="Escribe la pregunta (opcional) para guardarla con la respuesta">
+        <button id="btn-ask" class="btn" type="button" title="Leer la pregunta en voz alta">🔊 Leer</button>
+      </div>
+      <div class="yesno-grid">
+        <button class="answer answer-yes" type="button" data-scan data-answer="Sí" data-say="Sí">
+          <span class="answer-icon">👍</span><span class="answer-text">SÍ</span>
+        </button>
+        <button class="answer answer-no" type="button" data-scan data-answer="No" data-say="No">
+          <span class="answer-icon">👎</span><span class="answer-text">NO</span>
+        </button>
+      </div>
+      <div class="yesno-row">
+        <button class="answer answer-maybe" type="button" data-scan data-answer="No sé" data-say="No sé">🤷 NO SÉ</button>
+        <button class="answer answer-neutral" type="button" data-scan data-answer="Más o menos" data-say="Más o menos">👌 MÁS O MENOS</button>
+        <button class="answer answer-neutral" type="button" data-scan data-answer="Repite la pregunta" data-say="Repite la pregunta, por favor">🔁 REPITE</button>
+      </div>
+      <p class="hint">Haz preguntas que se contesten con sí o no, de una en una. Con la cámara activada, <strong>asentir = SÍ</strong> y <strong>negar con la cabeza = NO</strong>. Teclas: ← Sí, → No, ↓ No sé.</p>
+    </section>
+
+    <!-- FRASES -->
+    <section id="view-board" class="view view-board" data-title="Frases" hidden>
+      <nav id="board-cats" class="cat-strip" aria-label="Categorías"></nav>
+      <div id="board-grid" class="tile-grid" role="group" aria-label="Frases"></div>
+    </section>
+
+    <!-- DELETREAR -->
+    <section id="view-spell" class="view view-spell" data-title="Deletrear" hidden>
+      <div class="spell-output-wrap">
+        <div id="spell-output" class="spell-output" aria-live="polite" aria-label="Texto escrito"></div>
+        <button id="btn-spell-speak-top" class="btn btn-accent" type="button">🔊 Hablar</button>
+      </div>
+      <div id="spell-predictions" class="pred-row" aria-label="Palabras sugeridas"></div>
+      <div id="spell-keyboard" class="keyboard" aria-label="Teclado"></div>
+      <div class="saved-wrap">
+        <h2 class="section-title">Frases guardadas</h2>
+        <div id="spell-saved" class="saved-row"></div>
+      </div>
+    </section>
+
+    <!-- DOLOR -->
+    <section id="view-pain" class="view view-pain" data-title="Dolor" hidden>
+      <div class="pain-layout">
+        <div class="pain-body">
+          <div class="seg" role="group" aria-label="Lado del cuerpo">
+            <button class="seg-btn is-active" type="button" data-side="front">Delante</button>
+            <button class="seg-btn" type="button" data-side="back">Detrás</button>
+          </div>
+          <svg id="body-map" class="body-map" viewBox="0 0 200 440" role="group" aria-label="Mapa del cuerpo"></svg>
+          <p id="pain-selected" class="pain-selected">Toca la parte del cuerpo que duele</p>
+        </div>
+        <div class="pain-scale">
+          <h2 class="section-title">¿Cuánto duele?</h2>
+          <div id="pain-levels" class="levels" role="group" aria-label="Intensidad del dolor"></div>
+          <h2 class="section-title">Sobre el dolor</h2>
+          <div id="pain-quick" class="quick-row"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTORIAL -->
+    <section id="view-history" class="view view-history" data-title="Historial" hidden>
+      <div class="toolbar">
+        <button id="btn-copy-history" class="btn" type="button">📋 Copiar</button>
+        <button id="btn-clear-history" class="btn btn-danger" type="button">🗑 Borrar todo</button>
+      </div>
+      <div id="history-confirm" class="confirm" hidden>
+        <span>¿Borrar todo el historial? Esta acción no se puede deshacer.</span>
+        <button id="btn-clear-yes" class="btn btn-danger" type="button">Sí, borrar</button>
+        <button id="btn-clear-no" class="btn" type="button">Cancelar</button>
+      </div>
+      <p id="history-empty" class="hint">Todavía no hay nada. Cada respuesta, frase o aviso de ayuda aparecerá aquí con su hora.</p>
+      <ol id="history-list" class="hist"></ol>
+    </section>
+
+    <!-- AJUSTES -->
+    <section id="view-settings" class="view view-settings" data-title="Ajustes" hidden>
+      <form id="settings-form" class="settings" autocomplete="off">
+
+        <fieldset class="group">
+          <legend>Voz</legend>
+          <div class="field">
+            <label for="set-voice">Voz en español</label>
+            <select id="set-voice"></select>
+            <small id="voice-note" class="note"></small>
+          </div>
+          <div class="field">
+            <label for="set-rate">Velocidad: <output id="set-rate-out">1.0</output></label>
+            <input id="set-rate" type="range" min="0.6" max="1.3" step="0.05" value="0.95">
+          </div>
+          <div class="field">
+            <button id="btn-test-voice" class="btn" type="button">🔊 Probar la voz</button>
+          </div>
+        </fieldset>
+
+        <fieldset class="group">
+          <legend>Pantalla</legend>
+          <div class="field">
+            <label for="set-scale">Tamaño del texto</label>
+            <select id="set-scale">
+              <option value="1">Normal</option>
+              <option value="1.2">Grande</option>
+              <option value="1.4">Muy grande</option>
+              <option value="1.6">Enorme</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="set-keyboard-order">Orden de las letras al deletrear</label>
+            <select id="set-keyboard-order">
+              <option value="abc">Alfabético (A, B, C…)</option>
+              <option value="frecuencia">Por frecuencia (E, A, O, S…), más rápido con barrido</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="set-theme">Tema</label>
+            <select id="set-theme">
+              <option value="system">Como el dispositivo</option>
+              <option value="light">Claro</option>
+              <option value="dark">Oscuro</option>
+            </select>
+          </div>
+        </fieldset>
+
+        <fieldset class="group">
+          <legend>Barrido automático (para quien no puede tocar la pantalla)</legend>
+          <div class="field">
+            <label for="set-scan-interval">Tiempo por opción: <output id="set-scan-interval-out">2,0</output> s</label>
+            <input id="set-scan-interval" type="range" min="0.8" max="5" step="0.1" value="2">
+          </div>
+          <div class="field">
+            <label for="set-scan-loops">Vueltas antes de pausar</label>
+            <select id="set-scan-loops">
+              <option value="1">1 vuelta</option>
+              <option value="2">2 vueltas</option>
+              <option value="3">3 vueltas</option>
+              <option value="5">5 vueltas</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="set-scan-select">Cómo se elige la opción iluminada</label>
+            <select id="set-scan-select">
+              <option value="screen">Tocando cualquier parte de la pantalla, pulsador o tecla</option>
+              <option value="button">Solo con el botón SELECCIONAR, pulsador o tecla</option>
+            </select>
+            <small class="note">Los pulsadores Bluetooth para accesibilidad suelen enviar la tecla Espacio o Intro; ambas seleccionan. Flechas → y ← avanzan o retroceden.</small>
+          </div>
+          <div class="field field-check">
+            <input id="set-scan-speak" type="checkbox" checked>
+            <label for="set-scan-speak">Leer en voz alta cada opción al iluminarse</label>
+          </div>
+          <div class="field field-check">
+            <input id="set-scan-auto" type="checkbox">
+            <label for="set-scan-auto">Iniciar el barrido al abrir la aplicación</label>
+          </div>
+        </fieldset>
+
+        <fieldset class="group">
+          <legend>Cámara: asentir y negar con la cabeza (experimental)</legend>
+          <div class="field field-check">
+            <input id="set-cam" type="checkbox">
+            <label for="set-cam">Detectar gestos de cabeza con la cámara frontal</label>
+          </div>
+          <div class="field">
+            <label for="set-cam-sens">Sensibilidad: <output id="set-cam-sens-out">Media</output></label>
+            <input id="set-cam-sens" type="range" min="0.5" max="1.5" step="0.1" value="1">
+          </div>
+          <div class="field field-check">
+            <input id="set-cam-preview" type="checkbox" checked>
+            <label for="set-cam-preview">Mostrar vista previa pequeña de la cámara</label>
+          </div>
+          <div class="field">
+            <button id="btn-cam-test" class="btn" type="button">📷 Probar ahora</button>
+            <small id="cam-note" class="note">Asentir = Sí (o elegir la opción iluminada). Negar = No (o volver atrás). Las imágenes no salen del dispositivo. La primera vez descarga el modelo de detección (unos 10 MB) y necesita conexión.</small>
+          </div>
+        </fieldset>
+
+        <fieldset class="group">
+          <legend>Personas importantes</legend>
+          <div class="field">
+            <label for="set-people">Una por línea (aparecen en la categoría Personas)</label>
+            <textarea id="set-people" rows="4" placeholder="Mi esposa María&#10;Mi hijo Pablo&#10;Mi hermano"></textarea>
+          </div>
+        </fieldset>
+
+        <fieldset class="group">
+          <legend>Editar frases</legend>
+          <div class="field">
+            <label for="edit-cat">Categoría</label>
+            <select id="edit-cat"></select>
+          </div>
+          <div id="edit-list" class="edit-list"></div>
+          <div class="toolbar">
+            <button id="btn-edit-add" class="btn" type="button">➕ Añadir frase</button>
+            <button id="btn-edit-restore" class="btn" type="button">↩ Restaurar esta categoría</button>
+          </div>
+        </fieldset>
+
+        <fieldset class="group">
+          <legend>Copia de seguridad</legend>
+          <div class="field">
+            <label for="backup-text">Ajustes, frases y palabras aprendidas en texto. Cópialo y guárdalo; pégalo en otro dispositivo para restaurar.</label>
+            <textarea id="backup-text" rows="4" spellcheck="false"></textarea>
+          </div>
+          <div class="toolbar">
+            <button id="btn-backup-copy" class="btn" type="button">📋 Copiar copia</button>
+            <button id="btn-backup-restore" class="btn" type="button">📥 Restaurar desde el texto</button>
+            <button id="btn-reset-all" class="btn btn-danger" type="button">♻ Restablecer todo</button>
+          </div>
+          <div id="reset-confirm" class="confirm" hidden>
+            <span>¿Borrar todos los ajustes, frases personalizadas e historial de este dispositivo?</span>
+            <button id="btn-reset-yes" class="btn btn-danger" type="button">Sí, restablecer</button>
+            <button id="btn-reset-no" class="btn" type="button">Cancelar</button>
+          </div>
+        </fieldset>
+
+        <fieldset class="group">
+          <legend>Acerca de</legend>
+          <p class="note">Talk Again <span id="app-version"></span>. Funciona sin internet una vez abierta. Todo (frases, historial, ajustes) se guarda solo en este dispositivo; nada se envía a ningún servidor. Esta herramienta no sustituye la valoración de un fonoaudiólogo o logopeda.</p>
+          <p class="note"><a id="link-guide" href="docs/GUIA-FAMILIA.md" target="_blank" rel="noopener">Guía para la familia</a> · <a href="https://github.com/jesubarba123/talk-again" target="_blank" rel="noopener">Código fuente</a></p>
+        </fieldset>
+
+      </form>
+    </section>
+
+  </main>
+
+  <footer id="scanbar" class="scanbar" hidden>
+    <div id="scan-status" class="scan-status" aria-live="polite">Barrido activo</div>
+    <button id="btn-scan-pause" class="btn btn-ghost" type="button">⏸ Pausa</button>
+    <button id="btn-scan-select" class="btn-select" type="button">SELECCIONAR</button>
+  </footer>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <div id="flash" class="flash" hidden></div>
+
+  <div id="cam-panel" class="cam-panel" hidden>
+    <video id="cam-video" playsinline muted autoplay></video>
+    <div id="cam-status" class="cam-status">Cámara…</div>
+    <button id="cam-hide" class="cam-hide" type="button" aria-label="Ocultar la vista previa">✕</button>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script src="nod-detector.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
