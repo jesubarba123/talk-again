@@ -86,7 +86,7 @@ Los pictogramas son emojis del propio dispositivo, así no hay que descargar im�
 
 ## Apps ya existentes que merece la pena probar
 
-Antes o además de esta app, conviene probar lo que ya existe; un logopeda o fonoaudiólogo puede ayudar a elegir según cómo esté la comprensión, la lectura y la movilidad de la persona.
+Antes o además de esta app, conviene probar lo que ya existe; un fonoaudiólogo o logopeda puede ayudar a elegir según cómo esté la comprensión, la lectura y la movilidad de la persona.
 
 - [**Cboard**](https://www.cboard.io/) — gratuita y de código abierto, en español, con pictogramas, para web, Android, iOS y Windows. Muy parecida en espíritu a Talk Again, con muchos más símbolos.
 - [**Háblalo**](https://www.infobae.com/salud/2023/08/12/la-nueva-era-de-la-accesibilidad-como-funciona-la-plataforma-que-facilita-la-comunicacion-de-personas-con-discapacidades/) — app argentina gratuita (Android/iOS) que convierte texto en voz y voz en texto, funciona sin internet.
@@ -98,4 +98,4 @@ Antes o además de esta app, conviene probar lo que ya existe; un logopeda o fon
 
 ## Importante
 
-Esta herramienta **no sustituye** la valoración de un **logopeda o fonoaudiólogo** ni del equipo de rehabilitación. Tras un ictus, el habla puede mejorar durante meses con terapia; la comunicación aumentativa sirve para comunicarse mientras tanto y reduce la frustración, no frena la recuperación. Pide al hospital una valoración de comunicación aumentativa lo antes posible.
+Esta herramienta **no sustituye** la valoración de un **fonoaudiólogo o logopeda** ni del equipo de rehabilitación. Tras un ictus, el habla puede mejorar durante meses con terapia; la comunicación aumentativa sirve para comunicarse mientras tanto y reduce la frustración, no frena la recuperación. Pide al hospital una valoración de comunicación aumentativa lo antes posible.

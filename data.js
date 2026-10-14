@@ -37,7 +37,7 @@ window.TA_DATA = {
         { e: "🪑", t: "Quiero sentarme" },
         { e: "🛏️", t: "Quiero acostarme" },
         { e: "💊", t: "Mi medicina", s: "Quiero mi medicina" },
-        { e: "👓", t: "Mis gafas", s: "Necesito mis gafas" },
+        { e: "👓", t: "Mis lentes", s: "Necesito mis lentes" },
         { e: "🚿", t: "Quiero bañarme" },
         { e: "🪥", t: "Lavarme los dientes", s: "Quiero lavarme los dientes" },
         { e: "🤢", t: "Tengo náuseas", urgent: true },
@@ -130,6 +130,23 @@ window.TA_DATA = {
       ]
     }
   ],
+
+  /* Armar frase: comienzo + continuación (+ añadido). Las continuaciones más usadas suben solas. */
+  builder: {
+    starts: [
+      { e: "🙋", t: "Quiero", next: ["agua", "comer", "ir al baño", "dormir", "sentarme", "acostarme", "ver la tele", "escuchar música", "salir un rato", "descansar", "mi teléfono", "que me lean", "hablar con el médico", "intentar hablar", "otra cosa"] },
+      { e: "🙅", t: "No quiero", next: ["esto", "comer ahora", "más", "que me muevan", "visitas ahora", "la tele", "dormir todavía", "la medicina ahora", "estar solo", "que me toquen", "seguir"] },
+      { e: "🤲", t: "Tengo", next: ["sed", "hambre", "frío", "calor", "dolor", "miedo", "sueño", "náuseas", "ganas de ir al baño", "picazón", "ganas de toser", "una pregunta"] },
+      { e: "🤕", t: "Me duele", next: ["la cabeza", "el pecho", "el estómago", "la espalda", "el brazo", "la pierna", "la garganta", "la boca", "todo el cuerpo", "donde está la vía", "al moverme"] },
+      { e: "🆘", t: "Necesito", next: ["ayuda", "a la enfermera", "al médico", "mis lentes", "mi medicina", "cambiar de posición", "que me limpien", "que me acomoden la almohada", "aire", "silencio", "tiempo", "que me expliquen"] },
+      { e: "👀", t: "Quiero ver a", people: true, next: ["mi familia", "al médico", "a la enfermera", "a mis amigos"] },
+      { e: "📞", t: "Llama a", people: true, next: ["la enfermera", "el médico", "mi familia"] },
+      { e: "🙂", t: "Estoy", next: ["bien", "mal", "cansado", "triste", "nervioso", "mejor", "peor", "cómodo", "incómodo", "aburrido", "asustado", "contento"] },
+      { e: "❓", t: "¿Puedo", next: ["beber?", "comer?", "levantarme?", "dormir?", "ir al baño?", "ver la tele?", "salir?", "tener visitas?", "tomar algo para el dolor?", "irme a casa?"] },
+      { e: "💬", t: "Quiero decir que", next: ["gracias", "te quiero", "lo siento", "no entiendo", "sí entiendo", "estoy de acuerdo", "no estoy de acuerdo", "ya está", "espera", "no es eso", "más despacio"] }
+    ],
+    modifiers: ["ahora", "por favor", "más tarde", "un poco", "mucho", "otra vez", "despacio", "urgente"]
+  },
 
   /* Frases rápidas del modo Dolor */
   painQuick: [

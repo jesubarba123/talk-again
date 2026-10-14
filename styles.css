@@ -123,7 +123,7 @@ p { margin: 0; }
 .app {
   height: 100%;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto 1fr auto auto;
   max-width: 1400px;
   margin: 0 auto;
 }
@@ -244,6 +244,7 @@ p { margin: 0; }
 .tile-spell { background: var(--k-question); }
 .tile-history { background: var(--k-feel); }
 .tile-settings { background: var(--surface-2); }
+.tile-build { background: var(--k-action); }
 
 /* ---------- Sí / No ---------- */
 .question-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.6rem; }
@@ -310,6 +311,18 @@ p { margin: 0; }
 .k-question { background: var(--k-question); }
 .k-health { background: var(--k-health); }
 .tile.is-urgent { border-color: var(--no); }
+.tile.tile-textonly { min-height: 5.2rem; }
+.tile.is-selected { border-color: var(--fg); box-shadow: inset 0 0 0 2px var(--fg); }
+
+/* ---------- Armar frase ---------- */
+.build-sentence-wrap { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.6rem; align-items: stretch; }
+.build-sentence {
+  min-height: 4.2rem; padding: 0.7rem 0.9rem;
+  border: 2px solid var(--line); border-radius: 12px; background: var(--surface);
+  font-size: 1.5rem; font-weight: 700; overflow-wrap: anywhere;
+}
+.build-sentence:empty::before { content: "Elige cómo empieza la frase…"; color: var(--muted); font-weight: 400; }
+.build-step { display: grid; gap: 0.6rem; }
 
 /* ---------- Deletrear ---------- */
 .spell-output-wrap { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.6rem; align-items: stretch; }
@@ -449,6 +462,29 @@ p { margin: 0; }
   .scanbar { grid-template-columns: minmax(0, 1fr) auto; }
   .scan-status { grid-column: 1 / -1; font-size: 0.9rem; }
 }
+
+/* Deslizar para elegir */
+body.touch-drag .views { touch-action: none; }
+.drag-hl {
+  outline: 6px solid var(--focus) !important;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 12px var(--focus-ring) !important;
+  position: relative;
+  z-index: 2;
+}
+.dwell-anim::after {
+  content: ""; position: absolute; left: 0; right: auto; bottom: 0; height: 9px; width: 0;
+  background: var(--focus); border-radius: 0 0 var(--radius) var(--radius);
+  animation: dwell var(--dwell-ms, 900ms) linear forwards;
+}
+@keyframes dwell { to { width: 100%; } }
+.body-map g.drag-hl .part { fill: var(--focus); fill-opacity: 0.9; }
+.dragbar {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.6rem;
+  padding: 0.5rem 1rem calc(0.5rem + var(--safe-bottom));
+  background: var(--surface); border-top: 2px solid var(--line);
+}
+.dragbar .btn { min-width: 4.5rem; min-height: 3.6rem; font-size: 1.4rem; }
 
 /* Resaltado del barrido */
 .scan-hl {

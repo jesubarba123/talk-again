@@ -6,6 +6,18 @@
 <title>Talk Again</title>
 <meta name="description" content="Tablero de comunicación para personas que no pueden hablar tras un ictus: sí/no, frases con pictogramas, deletreo, dolor y barrido con pulsador o cámara.">
 <meta name="theme-color" content="#0A6D96">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Talk Again: para volver a decir lo que necesitas">
+<meta property="og:description" content="App web gratuita, sin internet y sin cuentas, para personas que no pueden hablar tras un ictus: sí/no, frases con pictogramas, dolor, deletreo y barrido con pulsador o cámara.">
+<meta property="og:url" content="https://jesubarba123.github.io/talk-again/">
+<meta property="og:image" content="https://jesubarba123.github.io/talk-again/icons/social.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="es_ES">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Talk Again: para volver a decir lo que necesitas">
+<meta name="twitter:description" content="App web gratuita y sin internet para personas que no pueden hablar tras un ictus.">
+<meta name="twitter:image" content="https://jesubarba123.github.io/talk-again/icons/social.png">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -44,6 +56,11 @@
           <span class="mode-icon">🗣️</span>
           <span class="mode-name">Frases</span>
           <span class="mode-desc">Necesidades, sentimientos, personas</span>
+        </button>
+        <button class="mode-tile tile-build" type="button" data-scan data-label="Armar frase" data-goto="build">
+          <span class="mode-icon">🧩</span>
+          <span class="mode-name">Armar frase</span>
+          <span class="mode-desc">Una frase en dos toques</span>
         </button>
         <button class="mode-tile tile-pain" type="button" data-scan data-label="Dolor" data-goto="pain">
           <span class="mode-icon">🤕</span>
@@ -96,6 +113,32 @@
     <section id="view-board" class="view view-board" data-title="Frases" hidden>
       <nav id="board-cats" class="cat-strip" aria-label="Categorías"></nav>
       <div id="board-grid" class="tile-grid" role="group" aria-label="Frases"></div>
+    </section>
+
+    <!-- ARMAR FRASE -->
+    <section id="view-build" class="view view-build" data-title="Armar frase" hidden>
+      <div class="build-sentence-wrap">
+        <div id="build-sentence" class="build-sentence" aria-live="polite" aria-label="Frase armada"></div>
+        <button id="btn-build-speak" class="btn btn-accent" type="button">🔊 Hablar</button>
+      </div>
+      <div id="build-step-1" class="build-step">
+        <h2 class="section-title">1. Empieza con…</h2>
+        <div id="build-starts" class="tile-grid" role="group" aria-label="Comienzos de frase"></div>
+      </div>
+      <div id="build-step-2" class="build-step" hidden>
+        <h2 id="build-step-2-title" class="section-title">2. …</h2>
+        <div id="build-nexts" class="tile-grid" role="group" aria-label="Continuaciones"></div>
+        <div class="toolbar"><button id="btn-build-back" class="btn" type="button">← Cambiar el comienzo</button></div>
+      </div>
+      <div id="build-step-3" class="build-step" hidden>
+        <h2 class="section-title">3. Añade algo (opcional)</h2>
+        <div id="build-mods" class="quick-row" role="group" aria-label="Añadidos"></div>
+        <div class="toolbar">
+          <button id="btn-build-save" class="btn" type="button">💾 Guardar en frases</button>
+          <button id="btn-build-new" class="btn btn-accent" type="button">🆕 Otra frase</button>
+        </div>
+      </div>
+      <p class="hint">Las continuaciones que más se usan van subiendo solas al principio.</p>
     </section>
 
     <!-- DELETREAR -->
@@ -192,6 +235,32 @@
               <option value="light">Claro</option>
               <option value="dark">Oscuro</option>
             </select>
+          </div>
+        </fieldset>
+
+        <fieldset class="group">
+          <legend>Tacto (si la mano tiembla o no es precisa)</legend>
+          <div class="field">
+            <label for="set-touch-mode">Cómo se elige con el dedo</label>
+            <select id="set-touch-mode">
+              <option value="tap">Tocando normalmente</option>
+              <option value="drag">Deslizando el dedo y soltando sobre la opción</option>
+              <option value="dwell">Deslizando y dejando el dedo quieto sobre la opción</option>
+            </select>
+            <small class="note">Al deslizar, la opción bajo el dedo se ilumina y se lee en voz alta, y se puede corregir antes de soltar. En estos modos la pantalla se mueve con los botones ▲ ▼ de abajo.</small>
+          </div>
+          <div class="field">
+            <label for="set-dwell">Tiempo quieto para elegir: <output id="set-dwell-out">0,9</output> s</label>
+            <input id="set-dwell" type="range" min="0.4" max="2.5" step="0.1" value="0.9">
+          </div>
+          <div class="field">
+            <label for="set-min-touch">Ignorar toques más cortos de: <output id="set-min-touch-out">0,00</output> s</label>
+            <input id="set-min-touch" type="range" min="0" max="0.8" step="0.05" value="0">
+            <small class="note">Evita que un roce accidental elija algo. Vale también para el modo normal.</small>
+          </div>
+          <div class="field field-check">
+            <input id="set-drag-speak" type="checkbox" checked>
+            <label for="set-drag-speak">Leer en voz alta la opción bajo el dedo</label>
           </div>
         </fieldset>
 
@@ -302,6 +371,12 @@
     <div id="scan-status" class="scan-status" aria-live="polite">Barrido activo</div>
     <button id="btn-scan-pause" class="btn btn-ghost" type="button">⏸ Pausa</button>
     <button id="btn-scan-select" class="btn-select" type="button">SELECCIONAR</button>
+  </footer>
+
+  <footer id="dragbar" class="dragbar" hidden>
+    <button id="btn-drag-up" class="btn" type="button" aria-label="Subir la pantalla">▲</button>
+    <div id="drag-status" class="scan-status" aria-live="polite"></div>
+    <button id="btn-drag-down" class="btn" type="button" aria-label="Bajar la pantalla">▼</button>
   </footer>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>

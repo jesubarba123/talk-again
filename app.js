@@ -13,7 +13,8 @@
     vocab: 'talkagain.v1.vocab',
     history: 'talkagain.v1.history',
     words: 'talkagain.v1.words',
-    saved: 'talkagain.v1.saved'
+    saved: 'talkagain.v1.saved',
+    builder: 'talkagain.v1.builder'
   };
   const store = {
     get(key, fallback) {
@@ -31,6 +32,7 @@
     voiceURI: '', rate: 0.95, scale: '1', theme: 'system', keyboardOrder: 'abc',
     scanInterval: 2, scanLoops: 2, scanSelect: 'screen', scanSpeak: true, scanAuto: false,
     cam: false, camSens: 1, camPreview: true,
+    touchMode: 'tap', dwellMs: 900, minTouchMs: 0, dragSpeak: true,
     people: ''
   };
   let settings = Object.assign({}, DEFAULT_SETTINGS, store.get(KEYS.settings, {}) || {});
@@ -38,6 +40,7 @@
   let history = store.get(KEYS.history, []) || [];
   let learned = store.get(KEYS.words, {}) || {};        // palabra -> veces usada
   let saved = store.get(KEYS.saved, []) || [];          // frases guardadas desde Deletrear
+  let builderStats = store.get(KEYS.builder, {}) || {}; // uso de continuaciones en Armar frase
 
   const saveSettings = () => store.set(KEYS.settings, settings);
 
@@ -76,6 +79,13 @@
   const speech = {
     voices: [],
     contentSpeaking: false,
+    unlocked: false,
+    /* iOS solo permite hablar tras un toque del usuario: el primer toque "desbloquea" la voz. */
+    unlock() {
+      if (this.unlocked || !this.supported) return;
+      this.unlocked = true;
+      try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) { /* nada */ }
+    },
     supported: 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window,
     init() {
       if (!this.supported) { renderVoiceSelect(); return; }
@@ -103,6 +113,7 @@
       if (!this.supported) { toast('Este navegador no tiene voz. Usa Chrome, Safari o Edge.'); return; }
       try {
         if (opts.scan && this.contentSpeaking) return;   // una etiqueta del barrido nunca corta una frase
+        const wasSpeaking = speechSynthesis.speaking || speechSynthesis.pending;
         speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
         const v = this.pickVoice();
@@ -116,7 +127,9 @@
           u.onend = done; u.onerror = done;
           setTimeout(done, 8000);
         }
-        speechSynthesis.speak(u);
+        // En Android Chrome, hablar justo después de cancelar pierde la frase: se espera un instante.
+        if (wasSpeaking) setTimeout(() => { try { speechSynthesis.speak(u); } catch (e) { /* nada */ } }, 60);
+        else speechSynthesis.speak(u);
       } catch (e) { console.warn('speech', e); }
     },
     stop() { if (this.supported) { try { speechSynthesis.cancel(); } catch (e) { /* nada */ } } }
@@ -207,6 +220,7 @@
     $('#view-title').textContent = target.dataset.title || 'Talk Again';
     $('#views').scrollTop = 0;
     if (view === 'board') renderBoard();
+    if (view === 'build') renderBuild();
     if (view === 'spell') renderSpell();
     if (view === 'pain') renderPain();
     if (view === 'history') renderHistory();
@@ -265,6 +279,7 @@
       $('#scanbar').hidden = false;
       const b = $('#btn-scan'); b.setAttribute('aria-pressed', 'true'); b.textContent = '⏹ Barrido';
       $('#btn-scan-pause').textContent = '⏸ Pausa';
+      touch.apply();
       this.refresh();
     },
     stop() {
@@ -274,6 +289,7 @@
       document.body.classList.remove('is-scanning', 'select-screen');
       $('#scanbar').hidden = true;
       const b = $('#btn-scan'); b.setAttribute('aria-pressed', 'false'); b.textContent = '▶ Barrido';
+      touch.apply();
     },
     toggle() { if (this.active) this.stop(); else this.start(); },
     status(msg) { $('#scan-status').textContent = msg; },
@@ -468,10 +484,10 @@
       class: 'tile ' + (k || '') + (item.urgent ? ' is-urgent' : ''),
       type: 'button', 'data-scan': '', 'data-label': item.t, 'data-say': item.s || item.t
     }, extraAttrs || {});
-    return el('button', attrs, [
-      el('span', { class: 'tile-emoji', text: item.e || '💬' }),
-      el('span', { class: 'tile-text', text: item.t })
-    ]);
+    const children = [];
+    if (item.e) children.push(el('span', { class: 'tile-emoji', text: item.e }));
+    children.push(el('span', { class: 'tile-text', text: item.t }));
+    return el('button', attrs, children);
   }
   function renderBoard() {
     const strip = $('#board-cats');
@@ -487,6 +503,135 @@
     const cat = categoryById(currentCat);
     itemsOf(currentCat).forEach(item => { if (item.t) grid.appendChild(makeTile(item, cat.k)); });
   }
+
+  function peopleNames() {
+    return (settings.people || '').split('\n').map(s => s.trim()).filter(Boolean);
+  }
+
+  /* ---------------- Armar frase ---------------- */
+  const build = { start: null, next: null, mods: [] };
+  function builderNexts(start) {
+    let list = start.next.slice();
+    if (start.people) list = peopleNames().concat(list);
+    const stats = builderStats[start.t] || {};
+    return list.map((t, i) => ({ t, i, n: stats[t] || 0 })).sort((a, b) => b.n - a.n || a.i - b.i).map(x => x.t);
+  }
+  function buildSentence() {
+    if (!build.start) return '';
+    let s = build.start.t;
+    if (build.next) s += ' ' + build.next;
+    if (build.mods.length) {
+      const q = s.endsWith('?');
+      if (q) s = s.slice(0, -1);
+      s += ' ' + build.mods.join(' ');
+      if (q) s += '?';
+    }
+    return s;
+  }
+  function renderBuild() {
+    $('#build-sentence').textContent = buildSentence();
+    $('#build-step-1').hidden = !!build.start;
+    $('#build-step-2').hidden = !build.start || !!build.next;
+    $('#build-step-3').hidden = !build.next;
+    const starts = $('#build-starts');
+    starts.innerHTML = '';
+    D.builder.starts.forEach((s, i) => starts.appendChild(makeTile({ e: s.e, t: s.t }, 'k-action', { 'data-start': String(i) })));
+    const nexts = $('#build-nexts');
+    nexts.innerHTML = '';
+    if (build.start) {
+      $('#build-step-2-title').textContent = `2. ${build.start.t}…`;
+      builderNexts(build.start).forEach(t => nexts.appendChild(makeTile({ t }, 'k-thing', { 'data-next': t, class: 'tile tile-textonly k-thing' })));
+    }
+    const mods = $('#build-mods');
+    mods.innerHTML = '';
+    D.builder.modifiers.forEach(m => mods.appendChild(makeTile({ t: m }, 'k-feel', {
+      'data-mod': m, class: 'tile tile-textonly k-feel' + (build.mods.includes(m) ? ' is-selected' : '')
+    })));
+  }
+  function buildSpeak() {
+    const s = buildSentence();
+    if (!s || !build.next) { toast('Elige el comienzo y la continuación'); return; }
+    speech.say(s);
+    addHistory('phrase', s);
+  }
+  function buildReset() { build.start = null; build.next = null; build.mods = []; renderBuild(); }
+
+  /* ---------------- Tacto: deslizar para elegir ---------------- */
+  const touch = {
+    pointerId: null, startAt: 0, lastDuration: 0, current: null, dwellTimer: 0, activating: false,
+    enabled() { return settings.touchMode !== 'tap' && !scanner.active; },
+    apply() {
+      const on = settings.touchMode !== 'tap' && !scanner.active;
+      document.body.classList.toggle('touch-drag', on);
+      $('#dragbar').hidden = !on;
+      document.documentElement.style.setProperty('--dwell-ms', Math.round(settings.dwellMs) + 'ms');
+      if (on) this.status('');
+      else this.release();
+    },
+    status(txt) {
+      $('#drag-status').textContent = txt || (settings.touchMode === 'dwell'
+        ? 'Desliza el dedo y déjalo quieto sobre la opción'
+        : 'Desliza el dedo y suelta sobre la opción');
+    },
+    targetAt(x, y) {
+      const e = document.elementFromPoint(x, y);
+      if (!e) return null;
+      const t = e.closest('[data-scan]');
+      return t && $('#views').contains(t) ? t : null;
+    },
+    down(e) {
+      if (!e.isPrimary) return;
+      this.startAt = performance.now();
+      if (!this.enabled() || currentView === 'settings') return;
+      if (e.target.closest('input, select, textarea, label, a')) return;
+      this.pointerId = e.pointerId;
+      try { $('#views').setPointerCapture(e.pointerId); } catch (err) { /* nada */ }
+      this.enter(this.targetAt(e.clientX, e.clientY));
+    },
+    move(e) {
+      if (this.pointerId !== e.pointerId) return;
+      const t = this.targetAt(e.clientX, e.clientY);
+      if (t !== this.current) this.enter(t);
+    },
+    enter(t) {
+      clearTimeout(this.dwellTimer);
+      if (this.current) this.current.classList.remove('drag-hl', 'dwell-anim');
+      this.current = t;
+      if (!t) { this.status(''); return; }
+      t.classList.add('drag-hl');
+      const label = labelOf(t);
+      this.status(label);
+      if (settings.dragSpeak) speech.say(label, { scan: true, rate: Math.min(1.5, settings.rate + 0.25) });
+      if (settings.touchMode === 'dwell') {
+        t.classList.add('dwell-anim');
+        this.dwellTimer = setTimeout(() => { t.classList.remove('dwell-anim'); this.fire(t); }, settings.dwellMs);
+      }
+    },
+    up(e) {
+      if (e.isPrimary) this.lastDuration = performance.now() - this.startAt;
+      if (this.pointerId !== e.pointerId) return;
+      const t = this.current;
+      const dur = this.lastDuration;
+      this.release();
+      if (settings.touchMode === 'drag' && t && dur >= settings.minTouchMs * 1000) this.fire(t);
+    },
+    cancel(e) { if (this.pointerId === e.pointerId) this.release(); },
+    release() {
+      clearTimeout(this.dwellTimer);
+      if (this.current) this.current.classList.remove('drag-hl', 'dwell-anim');
+      this.current = null;
+      this.pointerId = null;
+      if (settings.touchMode !== 'tap') this.status('');
+    },
+    fire(t) {
+      flashEl(t);
+      this.activating = true;
+      try {
+        if (typeof t.click === 'function') t.click();
+        else t.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      } finally { this.activating = false; }
+    }
+  };
 
   /* ---------------- Deletrear ---------------- */
   let spellText = '';
@@ -682,6 +827,7 @@
     if (settings.theme === 'light' || settings.theme === 'dark') document.documentElement.setAttribute('data-theme', settings.theme);
     else document.documentElement.removeAttribute('data-theme');
     document.body.classList.toggle('select-screen', scanner.active && settings.scanSelect === 'screen');
+    touch.apply();
   }
   function renderSettings() {
     renderVoiceSelect();
@@ -689,6 +835,10 @@
     $('#set-scale').value = String(settings.scale);
     $('#set-theme').value = settings.theme;
     const ko = $('#set-keyboard-order'); if (ko) ko.value = settings.keyboardOrder;
+    $('#set-touch-mode').value = settings.touchMode;
+    $('#set-dwell').value = settings.dwellMs / 1000; $('#set-dwell-out').textContent = (settings.dwellMs / 1000).toFixed(1).replace('.', ',');
+    $('#set-min-touch').value = settings.minTouchMs; $('#set-min-touch-out').textContent = Number(settings.minTouchMs).toFixed(2).replace('.', ',');
+    $('#set-drag-speak').checked = !!settings.dragSpeak;
     $('#set-scan-interval').value = settings.scanInterval; $('#set-scan-interval-out').textContent = Number(settings.scanInterval).toFixed(1).replace('.', ',');
     $('#set-scan-loops').value = String(settings.scanLoops);
     $('#set-scan-select').value = settings.scanSelect;
@@ -729,7 +879,7 @@
   function saveVocab() { store.set(KEYS.vocab, vocab); }
 
   function exportBackup() {
-    return JSON.stringify({ app: 'talk-again', v: 1, settings, vocab, words: learned, saved }, null, 0);
+    return JSON.stringify({ app: 'talk-again', v: 1, settings, vocab, words: learned, saved, builder: builderStats }, null, 0);
   }
   function importBackup(text) {
     let data;
@@ -739,7 +889,8 @@
     vocab = data.vocab && typeof data.vocab === 'object' ? data.vocab : {};
     learned = data.words && typeof data.words === 'object' ? data.words : {};
     saved = Array.isArray(data.saved) ? data.saved : [];
-    saveSettings(); saveVocab(); store.set(KEYS.words, learned); store.set(KEYS.saved, saved);
+    builderStats = data.builder && typeof data.builder === 'object' ? data.builder : {};
+    saveSettings(); saveVocab(); store.set(KEYS.words, learned); store.set(KEYS.saved, saved); store.set(KEYS.builder, builderStats);
     applySettings(); renderSettings();
     toast('Copia restaurada');
     return true;
@@ -798,7 +949,16 @@
 
     // Selección tocando la pantalla durante el barrido (fase de captura para adelantarse a los botones).
     $('#views').addEventListener('click', e => {
-      if (!scanner.active || scanner.activating) return;
+      if (scanner.activating || touch.activating) return;
+      const item = e.target.closest('[data-scan]');
+      const real = e.detail !== 0;   // 0 = teclado o click sintético
+      if (item && real && !scanner.active && currentView !== 'settings' && !e.target.closest('input, select, textarea, label, a')) {
+        // Al deslizar, elige el controlador táctil, no el click del navegador.
+        if (settings.touchMode !== 'tap') { e.preventDefault(); e.stopPropagation(); return; }
+        // Roces demasiado cortos se ignoran.
+        if (settings.minTouchMs > 0 && touch.lastDuration < settings.minTouchMs * 1000) { e.preventDefault(); e.stopPropagation(); return; }
+      }
+      if (!scanner.active) return;
       if (currentView === 'settings' || scanner.state === 'paused') return;
       if (settings.scanSelect !== 'screen') return;
       if (e.target.closest('input, select, textarea, label, a')) return;
@@ -821,6 +981,52 @@
         else if (e.key === 'ArrowRight') { e.preventDefault(); answer('No', 'No'); }
         else if (e.key === 'ArrowDown') { e.preventDefault(); answer('No sé', 'No sé'); }
       }
+    });
+
+    // Deslizar para elegir
+    const views = $('#views');
+    views.addEventListener('pointerdown', e => touch.down(e));
+    views.addEventListener('pointermove', e => touch.move(e));
+    views.addEventListener('pointerup', e => touch.up(e));
+    views.addEventListener('pointercancel', e => touch.cancel(e));
+    $('#btn-drag-up').addEventListener('click', () => views.scrollBy({ top: -views.clientHeight * 0.7, behavior: 'smooth' }));
+    $('#btn-drag-down').addEventListener('click', () => views.scrollBy({ top: views.clientHeight * 0.7, behavior: 'smooth' }));
+    // Desbloqueo de la voz con el primer toque (iOS).
+    document.addEventListener('pointerdown', () => speech.unlock(), { capture: true, once: true });
+    document.addEventListener('keydown', () => speech.unlock(), { capture: true, once: true });
+
+    // Armar frase
+    $('#view-build').addEventListener('click', e => {
+      const st = e.target.closest('[data-start]');
+      if (st) {
+        build.start = D.builder.starts[Number(st.dataset.start)]; build.next = null; build.mods = [];
+        renderBuild(); speech.say(build.start.t); scanner.refresh(); return;
+      }
+      const nx = e.target.closest('[data-next]');
+      if (nx && build.start) {
+        build.next = nx.dataset.next;
+        const key = build.start.t;
+        builderStats[key] = builderStats[key] || {};
+        builderStats[key][build.next] = (builderStats[key][build.next] || 0) + 1;
+        store.set(KEYS.builder, builderStats);
+        renderBuild(); buildSpeak(); scanner.refresh(); return;
+      }
+      const md = e.target.closest('[data-mod]');
+      if (md && build.next) {
+        const m = md.dataset.mod;
+        const i = build.mods.indexOf(m);
+        if (i >= 0) build.mods.splice(i, 1); else build.mods.push(m);
+        renderBuild(); buildSpeak(); scanner.refresh(); return;
+      }
+    });
+    $('#btn-build-speak').addEventListener('click', buildSpeak);
+    $('#btn-build-back').addEventListener('click', () => { build.start = null; build.next = null; build.mods = []; renderBuild(); scanner.refresh(); });
+    $('#btn-build-new').addEventListener('click', () => { buildReset(); scanner.refresh(); });
+    $('#btn-build-save').addEventListener('click', () => {
+      const s = buildSentence();
+      if (!s || !build.next) { toast('Primero arma la frase'); return; }
+      if (!saved.includes(s)) { saved.push(s); store.set(KEYS.saved, saved); }
+      toast('Guardada en «Frases guardadas» de Deletrear');
     });
 
     // Inicio
@@ -932,6 +1138,10 @@
     $('#set-theme').addEventListener('change', e => { settings.theme = e.target.value; saveSettings(); applySettings(); });
     const ko = $('#set-keyboard-order');
     if (ko) ko.addEventListener('change', e => { settings.keyboardOrder = e.target.value; saveSettings(); });
+    $('#set-touch-mode').addEventListener('change', e => { settings.touchMode = e.target.value; saveSettings(); applySettings(); });
+    $('#set-dwell').addEventListener('input', e => { settings.dwellMs = Math.round(Number(e.target.value) * 1000); $('#set-dwell-out').textContent = (settings.dwellMs / 1000).toFixed(1).replace('.', ','); saveSettings(); applySettings(); });
+    $('#set-min-touch').addEventListener('input', e => { settings.minTouchMs = Number(e.target.value); $('#set-min-touch-out').textContent = settings.minTouchMs.toFixed(2).replace('.', ','); saveSettings(); });
+    $('#set-drag-speak').addEventListener('change', e => { settings.dragSpeak = e.target.checked; saveSettings(); });
     $('#set-scan-interval').addEventListener('input', e => { settings.scanInterval = Number(e.target.value); $('#set-scan-interval-out').textContent = settings.scanInterval.toFixed(1).replace('.', ','); saveSettings(); });
     $('#set-scan-loops').addEventListener('change', e => { settings.scanLoops = Number(e.target.value); saveSettings(); });
     $('#set-scan-select').addEventListener('change', e => { settings.scanSelect = e.target.value; saveSettings(); applySettings(); });
@@ -1032,7 +1242,7 @@
 
   // Para pruebas y depuración desde la consola.
   window.TalkAgain = {
-    show, scanner, speech, answer, help,
+    show, scanner, speech, answer, help, touch, build,
     get settings() { return settings; },
     get history() { return history; },
     exportBackup, importBackup

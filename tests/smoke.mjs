@@ -30,7 +30,9 @@ try {
   await page.evaluate(() => { try { localStorage.clear(); } catch (e) {} });
   await page.reload({ waitUntil: 'load' });
   await page.screenshot({ path: path.join(SHOTS, 'desktop-home.png') });
-  check(await page.locator('.mode-tile').count() === 6, 'Inicio muestra 6 modos');
+  check(await page.locator('.mode-tile').count() === 7, 'Inicio muestra 7 modos');
+  check((await page.locator('meta[property="og:image"]').getAttribute('content') || '').endsWith('icons/social.png'), 'Etiquetas Open Graph presentes');
+  check((await page.request.get(BASE + 'icons/social.png')).ok(), 'Imagen social servida');
 
   // Frases
   await page.click('[data-goto="board"]');
@@ -82,6 +84,78 @@ try {
   await page.click('.seg-btn[data-side="back"]');
   check(await page.locator('#body-map [data-part="espalda_baja"]').isVisible(), 'Vista de espalda visible');
   await page.screenshot({ path: path.join(SHOTS, 'desktop-pain.png') });
+
+  // Armar frase
+  await page.click('#btn-home'); await page.click('[data-goto="build"]');
+  check(await page.locator('#build-starts .tile').count() === 10, 'Armar frase: 10 comienzos');
+  await page.click('#build-starts [data-start="0"]');
+  check(await page.locator('#build-step-2').isVisible() && (await page.locator('#build-step-2-title').textContent()).includes('Quiero'), 'Paso 2 muestra continuaciones de "Quiero"');
+  await page.click('#build-nexts [data-next="agua"]');
+  hist = await page.evaluate(() => window.TalkAgain.history);
+  check(hist[hist.length - 1].text === 'Quiero agua', 'Frase armada "Quiero agua" en el historial');
+  await page.click('#build-mods [data-mod="por favor"]');
+  check((await page.locator('#build-sentence').innerText()).trim() === 'Quiero agua por favor', 'Añadido "por favor"');
+  await page.click('#btn-build-save');
+  await page.click('#btn-build-new'); await page.click('#build-starts [data-start="0"]');
+  check((await page.locator('#build-nexts .tile').first().innerText()).trim() === 'agua', 'La continuación usada sube al principio');
+  await page.click('#btn-build-back'); await page.click('#build-starts [data-start="8"]');
+  await page.click('#build-nexts [data-next="beber?"]'); await page.click('#build-mods [data-mod="ahora"]');
+  check((await page.locator('#build-sentence').innerText()).trim() === '¿Puedo beber ahora?', 'Pregunta con añadido conserva el signo');
+  await page.click('#btn-home'); await page.click('[data-goto="spell"]');
+  check((await page.locator('.saved-chip').allTextContents()).some(t => t.includes('Quiero agua por favor')), 'Frase guardada desde Armar aparece en Deletrear');
+  await page.screenshot({ path: path.join(SHOTS, 'desktop-build.png') });
+
+  // Deslizar y soltar
+  await page.click('#btn-settings'); await page.selectOption('#set-touch-mode', 'drag');
+  await page.evaluate(() => window.TalkAgain.show('board'));
+  check(await page.locator('#dragbar').isVisible(), 'Barra de deslizar visible');
+  let before = (await page.evaluate(() => window.TalkAgain.history)).length;
+  const t1 = page.locator('#board-grid .tile').nth(0), t2 = page.locator('#board-grid .tile').nth(3);
+  const b1 = await t1.boundingBox(), b2 = await t2.boundingBox();
+  await page.mouse.move(b1.x + b1.width / 2, b1.y + b1.height / 2); await page.mouse.down();
+  await page.mouse.move(b2.x + b2.width / 2, b2.y + b2.height / 2, { steps: 8 });
+  check(await t2.evaluate(e => e.classList.contains('drag-hl')), 'La opción bajo el dedo se ilumina');
+  await page.mouse.up();
+  await page.waitForTimeout(100);
+  hist = await page.evaluate(() => window.TalkAgain.history);
+  check(hist.length === before + 1 && hist[hist.length - 1].text === await t2.evaluate(e => e.dataset.label), 'Soltar sobre la opción la elige una sola vez');
+  before = hist.length;
+  await page.mouse.move(b1.x + 10, b1.y + 10); await page.mouse.down(); await page.mouse.move(6, 300, { steps: 5 }); await page.mouse.up();
+  await page.waitForTimeout(100);
+  hist = await page.evaluate(() => window.TalkAgain.history);
+  check(hist.length === before, 'Soltar fuera de las opciones no elige nada');
+  await page.screenshot({ path: path.join(SHOTS, 'desktop-drag.png') });
+
+  // Deslizar y mantener quieto
+  await page.click('#btn-settings'); await page.selectOption('#set-touch-mode', 'dwell');
+  await page.evaluate(() => { const r = document.getElementById('set-dwell'); r.value = '0.4'; r.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.evaluate(() => window.TalkAgain.show('board'));
+  const t3 = page.locator('#board-grid .tile').nth(1); const b3 = await t3.boundingBox();
+  before = (await page.evaluate(() => window.TalkAgain.history)).length;
+  await page.mouse.move(b3.x + b3.width / 2, b3.y + b3.height / 2); await page.mouse.down();
+  await page.waitForTimeout(150);
+  hist = await page.evaluate(() => window.TalkAgain.history);
+  check(hist.length === before, 'Sin esperar el tiempo quieto no elige');
+  await page.waitForTimeout(500);
+  hist = await page.evaluate(() => window.TalkAgain.history);
+  check(hist.length === before + 1, 'Dejar el dedo quieto elige');
+  await page.waitForTimeout(700);
+  hist = await page.evaluate(() => window.TalkAgain.history);
+  check(hist.length === before + 1, 'Mantener el dedo no repite la elección');
+  await page.mouse.up();
+
+  // Toques cortos ignorados en modo normal
+  await page.click('#btn-settings'); await page.selectOption('#set-touch-mode', 'tap');
+  await page.evaluate(() => { const r = document.getElementById('set-min-touch'); r.value = '0.3'; r.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.evaluate(() => window.TalkAgain.show('board'));
+  before = (await page.evaluate(() => window.TalkAgain.history)).length;
+  await page.locator('#board-grid .tile').nth(2).click();
+  hist = await page.evaluate(() => window.TalkAgain.history);
+  check(hist.length === before, 'Un toque muy corto se ignora');
+  await page.locator('#board-grid .tile').nth(2).click({ delay: 400 });
+  hist = await page.evaluate(() => window.TalkAgain.history);
+  check(hist.length === before + 1, 'Un toque de 0,4 s sí elige');
+  await page.evaluate(() => { const r = document.getElementById('set-min-touch'); r.value = '0'; r.dispatchEvent(new Event('input', { bubbles: true })); });
 
   // Historial
   await page.click('#btn-home'); await page.click('[data-goto="history"]');
@@ -139,7 +213,7 @@ try {
     check(r.sw <= r.cw && r.vw <= r.vc, `Sin desbordamiento horizontal en móvil: ${name} (${r.sw}/${r.cw}, views ${r.vw}/${r.vc})`);
   };
   await noOverflow('inicio'); await mobile.screenshot({ path: path.join(SHOTS, 'mobile-home.png') });
-  for (const v of ['yesno', 'board', 'spell', 'pain', 'history', 'settings']) {
+  for (const v of ['yesno', 'board', 'build', 'spell', 'pain', 'history', 'settings']) {
     await mobile.evaluate(view => window.TalkAgain.show(view), v);
     await mobile.waitForTimeout(150);
     await noOverflow(v);
