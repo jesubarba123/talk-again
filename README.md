@@ -84,10 +84,12 @@ Sin frameworks ni compilación. Archivos:
 - `nod-detector.js`: detección de asentir/negar con la cámara.
 - `sw.js`, `manifest.webmanifest`, `icons/`, `fonts/`: instalación, uso sin conexión y tipografía Atkinson Hyperlegible (diseñada para baja visión, licencia OFL).
 - `tests/smoke.mjs`: prueba de humo con Playwright (recorre todas las pantallas, comprueba barrido, tacto, historial, ajustes y que no hay desbordamiento en móvil, también con texto enorme).
+- `tests/explore.mjs`: prueba exploratoria más larga (editor de frases, copia de seguridad, barrido por pantalla, modos de tacto, hombre/mujer, personas, sin conexión y actualización, y contraste del texto medido sobre los píxeles reales en los dos temas).
 
 ```bash
 npm install          # solo para las pruebas (Playwright)
-npm test             # ejecuta tests/smoke.mjs
+npm test             # ejecuta tests/smoke.mjs (rápida)
+npm run test:explore # ejecuta tests/explore.mjs (unos 8 minutos)
 npm start            # servidor local en http://localhost:8080
 ```
 

@@ -411,14 +411,28 @@
       const top = e => e.getBoundingClientRect().top;
       const left = e => e.getBoundingClientRect().left;
       auto.sort((a, b) => top(a) - top(b));
-      const rows = [];
+      let rows = [];
       auto.forEach(e => {
         const last = rows[rows.length - 1];
         if (last && Math.abs(top(e) - top(last[0])) <= 12) last.push(e);
         else rows.push([e]);
       });
-      explicit.forEach(items => rows.push(items));
       rows.forEach(r => r.sort((a, b) => left(a) - left(b)));
+      // En pantallas estrechas (una o dos fichas por fila) salen muchas filas y cada vuelta tarda mucho:
+      // se juntan filas vecinas del mismo bloque en grupos de unas √N opciones.
+      this.merged = false;
+      if (rows.length > 6) {
+        const count = visible.length;
+        const per = Math.min(8, Math.max(4, Math.ceil(Math.sqrt(count))));
+        const merged = [];
+        rows.forEach(r => {
+          const last = merged[merged.length - 1];
+          if (last && last.length + r.length <= per && last[0].parentElement === r[0].parentElement) { last.push(...r); this.merged = true; }
+          else merged.push(r.slice());
+        });
+        rows = merged;
+      }
+      explicit.forEach(items => rows.push(items.slice().sort((a, b) => left(a) - left(b))));
       rows.sort((a, b) => Math.min(...a.map(top)) - Math.min(...b.map(top)));
       const total = rows.reduce((n, r) => n + r.length, 0);
       this.groups = (total <= 8 || rows.length === 1) ? [rows.flat()] : rows;
@@ -448,7 +462,7 @@
         const g = this.groups[this.gi];
         g.forEach(e => e.classList.add('scan-group-hl'));
         try { g[0].scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) { /* nada */ }
-        const label = `Fila ${this.gi + 1} de ${this.groups.length}`;
+        const label = `${this.merged ? 'Grupo' : 'Fila'} ${this.gi + 1} de ${this.groups.length}`;
         this.status(label + ' · toca para entrar');
         if (settings.scanSpeak) speech.say(label, { scan: true });
       } else {
@@ -623,8 +637,8 @@
       if (q) s = s.slice(0, -1);
       const rest = build.mods.filter(m => m !== 'por favor');
       if (rest.length) s += ' ' + rest.join(' ');
+      if (build.mods.includes('por favor')) s += ', por favor';   // dentro de los signos de pregunta: "¿Puedo beber, por favor?"
       if (q) s += '?';
-      if (build.mods.includes('por favor')) s += ', por favor';
     }
     return s.replace(/\ba el\b/g, 'al');
   }
@@ -900,6 +914,7 @@
         if (p.id === painPart) g.classList.add('is-selected');
         const small = p.shape === 'ellipse' ? p.rx < 26 : p.w < 50;   // zonas pequeñas: letra más pequeña
         if (small) g.classList.add('small');
+        g.dataset.inner = String((p.shape === 'ellipse' ? 2 * p.rx : p.w) - 9);   // ancho útil para la etiqueta (sin el trazo)
         g.appendChild(svgShape(ns, p, 7, 'hit'));    // zona de toque ampliada (invisible)
         g.appendChild(svgShape(ns, p, 0, 'part'));
         const label = document.createElementNS(ns, 'text');
@@ -907,7 +922,7 @@
         const cy = p.shape === 'ellipse' ? p.cy : p.y + p.h / 2;
         label.setAttribute('x', cx); label.setAttribute('y', cy + 4.5); label.setAttribute('text-anchor', 'middle');
         const words = p.label.split(' ');
-        const narrow = p.shape === 'ellipse' ? p.rx < 30 : p.w < 60;
+        const narrow = p.shape === 'ellipse' ? p.rx < 30 : p.w < 90;
         if (words.length > 1 && narrow) {
           label.setAttribute('y', cy - 2);
           const t1 = document.createElementNS(ns, 'tspan'); t1.setAttribute('x', cx); t1.textContent = words[0];
@@ -928,6 +943,30 @@
       b.setAttribute('data-scan', '');
       b.setAttribute('data-row', 'side');
       b.setAttribute('data-label', b.textContent.trim());
+    });
+    fitBodyLabels();
+  }
+
+  /* Si una etiqueta del mapa es más ancha que su zona (otra tipografía, sin conexión…), se comprime
+     con textLength para que no pise el contorno. Se mide con un canvas para cubrir también el lado oculto. */
+  function fitBodyLabels() {
+    const svg = $('#body-map');
+    if (!svg) return;
+    let ctx = null;
+    try { ctx = document.createElement('canvas').getContext('2d'); } catch (e) { /* nada */ }
+    if (!ctx) return;
+    $$('g[data-part]', svg).forEach(g => {
+      const inner = Number(g.dataset.inner || 0);
+      const label = g.querySelector('text');
+      if (!inner || !label) return;
+      const cs = getComputedStyle(label);
+      ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      const spans = label.querySelectorAll('tspan');
+      (spans.length ? Array.from(spans) : [label]).forEach(t => {
+        const w = ctx.measureText(t.textContent).width;
+        if (w > inner) { t.setAttribute('textLength', String(inner)); t.setAttribute('lengthAdjust', 'spacingAndGlyphs'); }
+        else { t.removeAttribute('textLength'); t.removeAttribute('lengthAdjust'); }
+      });
     });
   }
   function renderLevels() {
@@ -1456,17 +1495,21 @@
     try {
       const hadSW = !!navigator.serviceWorker.controller;   // true = ya había una versión instalada
       navigator.serviceWorker.register('sw.js').then(reg => {
-        const first = reg.installing;
-        if (first && !hadSW) {
-          first.addEventListener('statechange', () => { if (first.state === 'activated') toast('Lista para usar sin internet'); });
-        }
-        reg.addEventListener('updatefound', () => {
-          const w = reg.installing;
-          if (!w || !hadSW) return;
+        // El worker que se instala con la app recién abierta por primera vez es la instalación inicial;
+        // cualquier otro (ya había una versión controlando la página, o es el segundo de esta sesión) es una actualización.
+        const seen = new Set();
+        const watch = w => {
+          if (!w || seen.has(w)) return;
+          seen.add(w);
+          const update = hadSW || seen.size > 1;
           w.addEventListener('statechange', () => {
-            if (w.state === 'activated') toast('Versión nueva lista: cierra y vuelve a abrir la app', 5000);
+            if (w.state !== 'activated') return;
+            if (update) toast('Versión nueva lista: cierra y vuelve a abrir la app', 5000);
+            else toast('Lista para usar sin internet');
           });
-        });
+        };
+        watch(reg.installing);
+        reg.addEventListener('updatefound', () => watch(reg.installing));
       }).catch(() => { /* no disponible */ });
     } catch (e) { /* nada */ }
   }
@@ -1485,6 +1528,7 @@
     }
     show('home');
     registerSW();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitBodyLabels).catch(() => { /* nada */ });
     if (settings.scanAuto || (settings.cam && !window.TA_ARTIFACT)) {
       // La voz y la cámara necesitan un primer toque: una pantalla de "empezar" lo garantiza.
       const gate = el('button', { class: 'start-gate', type: 'button' }, [
