@@ -106,7 +106,7 @@ try {
   check((await page.locator('#build-sentence').innerText()).trim() === 'Quiero agua, por favor', 'Agregado "por favor" con coma');
   await page.click('#btn-build-save');
   await page.click('#btn-build-new'); await page.click('#build-starts [data-start="0"]');
-  check((await page.locator('#build-nexts .tile').first().innerText()).trim() === 'agua', 'La continuación usada sube al principio');
+  check((await page.locator('#build-nexts .tile .tile-text').first().textContent()).trim() === 'agua', 'La continuación usada sube al principio');   // textContent: la CSS lo muestra en mayúsculas
   await page.click('#btn-build-back'); await page.click('#build-starts [data-start="8"]');
   await page.click('#build-nexts [data-next="beber?"]'); await page.click('#build-mods [data-mod="ahora"]');
   check((await page.locator('#build-sentence').innerText()).trim() === '¿Puedo beber ahora?', 'Pregunta con añadido conserva el signo');
@@ -268,7 +268,7 @@ try {
   await page.screenshot({ path: path.join(SHOTS, 'desktop-scan.png') });
   await page.keyboard.press('Space');
   await page.waitForTimeout(200);
-  check((await page.locator('#view-title').innerText()) === 'Sí / No', 'Espacio activa la opción iluminada (abre Sí / No)');
+  check((await page.locator('#view-title').textContent()).trim() === 'Sí / No', 'Espacio activa la opción iluminada (abre Sí / No)');
   await page.waitForTimeout(1700);
   check(await page.locator('#view-yesno .scan-hl').count() === 1, 'El barrido continúa en la nueva pantalla');
   // Tocar la pantalla selecciona
