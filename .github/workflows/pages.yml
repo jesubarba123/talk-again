@@ -28,6 +28,8 @@ jobs:
       - uses: actions/configure-pages@v5
         with:
           enablement: true   # crea el sitio de Pages si aún no existe (el repositorio debe ser público en cuentas gratuitas)
+      - name: Versionar la caché del service worker con el commit
+        run: sed -i "s/talkagain-v[0-9.]*'/talkagain-${GITHUB_SHA::8}'/" sw.js && grep -n "const VERSION" sw.js
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .

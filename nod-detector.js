@@ -1,6 +1,6 @@
 /* Talk Again — detector de gestos de cabeza (asentir = sí, negar = no) con la cámara frontal.
-   Usa MediaPipe Face Landmarker (se descarga de un CDN la primera vez; después queda en la caché
-   del navegador). Las imágenes se procesan en el dispositivo y no se envían a ningún sitio. */
+   Usa MediaPipe Face Landmarker (se descarga de un CDN la primera vez; el service worker lo guarda
+   para usarlo sin conexión). Las imágenes se procesan en el dispositivo y no salen de él. */
 (function () {
   'use strict';
 
@@ -10,7 +10,7 @@
 
   const WINDOW_MS = 1200;      // ventana de análisis
   const REFRACTORY_MS = 1600;  // tiempo mínimo entre gestos
-  const INFER_EVERY_MS = 66;   // ~15 imágenes por segundo
+  const INFER_EVERY_MS = 100;  // ~10 imágenes por segundo: suficiente y gasta menos batería
 
   let landmarker = null;
   let stream = null;
@@ -18,9 +18,12 @@
   let running = false;
   let starting = false;
   let rafId = 0;
+  let failures = 0;
   let opts = { sensitivity: 1, onGesture: function () {}, onStatus: function () {}, video: null };
   let samples = [];
   let lastGestureAt = 0, lastFaceAt = 0, lastInferAt = 0, lastStatusAt = 0;
+
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
   function status(state, msg, extra) {
     try { opts.onStatus(state, msg, extra); } catch (e) { /* nada */ }
@@ -32,6 +35,7 @@
     const fileset = await vision.FilesetResolver.forVisionTasks(MP_BASE + '/wasm');
     const options = {
       baseOptions: { modelAssetPath: MODEL_URL, delegate: 'GPU' },
+      canvas: document.createElement('canvas'),   // evita OffscreenCanvas sin WebGL en iPadOS 16
       runningMode: 'VIDEO',
       numFaces: 1,
       outputFacialTransformationMatrixes: true,
@@ -72,15 +76,20 @@
     } catch (e) {
       console.warn('getUserMedia', e);
       starting = false;
-      status('error', 'Sin permiso para la cámara. Permítelo en el navegador (icono del candado) y vuelve a probar.');
+      status('error', isIOS
+        ? 'Sin permiso para la cámara. En Safari: menú "aA" → Ajustes del sitio web → Cámara → Permitir; en la app instalada: Configuración → Safari → Cámara.'
+        : 'Sin permiso para la cámara. Permítelo en el navegador (icono del candado junto a la dirección) y vuelve a probar.');
       return false;
     }
+    const track = stream.getVideoTracks()[0];
+    if (track) track.addEventListener('ended', () => { if (running) { stop(); status('error', 'La cámara se detuvo. Vuelve a activarla.'); } });
     video = opts.video || document.createElement('video');
     video.srcObject = stream;
     video.muted = true;
     video.setAttribute('playsinline', '');
     try { await video.play(); } catch (e) { /* algunos navegadores reproducen solos */ }
     samples = [];
+    failures = 0;
     lastGestureAt = 0; lastFaceAt = 0; lastInferAt = 0;
     running = true;
     starting = false;
@@ -100,6 +109,10 @@
     status('stopped', 'Cámara apagada');
   }
 
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && running && video && video.paused) video.play().catch(() => { /* nada */ });
+  });
+
   /* Ángulos (grados) a partir de la matriz 4x4 (orden por columnas) que da MediaPipe.
      pitch = inclinar la cabeza arriba/abajo (asentir); yaw = girarla a los lados (negar). */
   function anglesFromMatrix(d) {
@@ -118,7 +131,7 @@
   /* Un gesto es un movimiento de ida y vuelta: amplitud suficiente en un eje, poca en el otro,
      y la cabeza termina cerca de donde empezó. */
   function detect(list) {
-    if (list.length < 6) return null;
+    if (list.length < 5) return null;
     const first = list[0], last = list[list.length - 1];
     if (last.t - first.t < 350) return null;
     const sens = Math.max(0.3, Number(opts.sensitivity) || 1);
@@ -136,12 +149,23 @@
   function loop() {
     if (!running) return;
     rafId = requestAnimationFrame(loop);
+    if (document.hidden) return;
     const now = performance.now();
     if (now - lastInferAt < INFER_EVERY_MS) return;
     if (!video || video.readyState < 2) return;
     lastInferAt = now;
     let result;
-    try { result = landmarker.detectForVideo(video, now); } catch (e) { return; }
+    try {
+      result = landmarker.detectForVideo(video, now);
+      failures = 0;
+    } catch (e) {
+      if (++failures > 30) {
+        console.warn('detectForVideo', e);
+        stop();
+        status('error', 'El detector falló en este dispositivo. Desactiva y vuelve a activar la cámara.');
+      }
+      return;
+    }
     const mats = result && result.facialTransformationMatrixes;
     const m = mats && mats[0] && mats[0].data;
     if (!m) {

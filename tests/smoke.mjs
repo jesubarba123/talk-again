@@ -7,14 +7,21 @@ import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const PORT = 8123;
 const BASE = `http://127.0.0.1:${PORT}/`;
 const SHOTS = process.env.SHOTS_DIR || path.join(tmpdir(), 'talk-again-shots');
 mkdirSync(SHOTS, { recursive: true });
 
-const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: path.resolve(path.dirname(new URL(import.meta.url).pathname), '..'), stdio: 'ignore' });
-await new Promise(r => setTimeout(r, 900));
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: ROOT, stdio: 'ignore' });
+process.on('exit', () => { try { server.kill(); } catch (e) { /* nada */ } });
+for (const t0 = Date.now(); ;) {
+  try { if ((await fetch(BASE)).ok) break; } catch (e) { /* aún no */ }
+  if (Date.now() - t0 > 15000) throw new Error('El servidor estático no arrancó');
+  await new Promise(r => setTimeout(r, 100));
+}
 
 let failures = 0;
 const check = (cond, msg) => { console.log((cond ? 'OK   ' : 'FAIL ') + msg); if (!cond) failures++; };
@@ -76,11 +83,11 @@ try {
 
   // Dolor
   await page.click('#btn-home'); await page.click('[data-goto="pain"]');
-  check(await page.locator('#body-map [data-part]').count() === 26, 'Mapa del cuerpo: 26 zonas (13 delante + 13 detrás)');
+  check(await page.locator('#body-map [data-part]').count() === 30, 'Mapa del cuerpo: 30 zonas (15 delante + 15 detrás)');
   await page.click('#body-map [data-part="pecho"]');
   await page.click('.level[data-level="7"]');
   hist = await page.evaluate(() => window.TalkAgain.history);
-  check(hist[hist.length - 1].text.includes('Me duele el pecho') && hist[hist.length - 1].text.includes('7 de 10'), 'Dolor: zona + intensidad en el historial');
+  check(hist[hist.length - 1].text.includes('Me duele el pecho') && hist[hist.length - 1].text.includes('7 de 10, fuerte'), 'Dolor: zona + intensidad con palabra en el historial');
   await page.click('.seg-btn[data-side="back"]');
   check(await page.locator('#body-map [data-part="espalda_baja"]').isVisible(), 'Vista de espalda visible');
   await page.screenshot({ path: path.join(SHOTS, 'desktop-pain.png') });
@@ -157,8 +164,85 @@ try {
   check(hist.length === before + 1, 'Un toque de 0,4 s sí elige');
   await page.evaluate(() => { const r = document.getElementById('set-min-touch'); r.value = '0'; r.dispatchEvent(new Event('input', { bubbles: true })); });
 
+  // Género y personas importantes
+  await page.evaluate(() => window.TalkAgain.show('settings'));
+  await page.click('#set-gender-f');
+  await page.fill('#set-people', 'Mi esposa Ana\nMi hijo Luis');
+  await page.evaluate(() => window.TalkAgain.show('board'));
+  await page.click('[data-cat="sentimientos"]');
+  check((await page.locator('#board-grid .tile .tile-text').allTextContents()).includes('Estoy enojada'), 'Con "Mujer" las frases cambian a femenino');
+  await page.click('[data-cat="personas"]');
+  const personas = await page.locator('#board-grid .tile').allTextContents();
+  check(personas.some(t => t.includes('Ver a Mi esposa Ana')) && personas.some(t => t.includes('Llamar a Mi hijo Luis')), 'Cada persona importante crea dos frases');
+  await page.evaluate(() => window.TalkAgain.show('settings'));
+  await page.click('#set-gender-m');
+
+  // AYUDA: un toque corto no dispara; mantener medio segundo sí
+  await page.evaluate(() => window.TalkAgain.show('home'));
+  before = (await page.evaluate(() => window.TalkAgain.history)).length;
+  await page.click('#btn-help');
+  await page.waitForTimeout(150);
+  hist = await page.evaluate(() => window.TalkAgain.history);
+  check(hist.length === before, 'Un toque corto en AYUDA no dispara la alarma');
+  const hb = await page.locator('#btn-help').boundingBox();
+  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2); await page.mouse.down(); await page.waitForTimeout(850); await page.mouse.up();
+  hist = await page.evaluate(() => window.TalkAgain.history);
+  check(hist.length === before + 1 && hist[hist.length - 1].type === 'help', 'Mantener AYUDA medio segundo dispara la alarma');
+  check(await page.locator('#flash').isVisible(), 'Destello del borde visible');
+
+  // Barrido: la cabecera también elige en modo pantalla, y la pausa sobrevive al cambio de pantalla
+  await page.evaluate(() => window.TalkAgain.show('yesno'));
+  await page.click('#btn-scan'); await page.waitForTimeout(300);
+  before = hist.length;
+  await page.click('#btn-settings');
+  await page.waitForTimeout(150);
+  hist = await page.evaluate(() => window.TalkAgain.history);
+  check(hist.length === before + 1 && (await page.locator('#view-title').textContent()) === 'Sí / No', 'Con barrido activo, tocar ⚙️ elige la opción iluminada en vez de abrir Ajustes');
+  await page.waitForTimeout(1100);
+  await page.click('#btn-scan-pause');
+  await page.click('#btn-home');
+  check((await page.locator('#view-title').textContent()) === 'Talk Again' && await page.evaluate(() => window.TalkAgain.scanner.state === 'paused'), 'En pausa, 🏠 funciona y la pausa se mantiene al cambiar de pantalla');
+  check(await page.locator('.scan-hl, .scan-group-hl').count() === 0, 'En pausa no hay resaltado');
+  await page.click('#btn-scan-pause');
+  await page.waitForTimeout(200);
+  check(await page.locator('.scan-hl').count() === 1, '"Seguir" reanuda el barrido');
+  await page.click('#btn-scan');
+
+  // En modo deslizar, los botones normales siguen funcionando
+  await page.evaluate(() => window.TalkAgain.show('settings'));
+  await page.selectOption('#set-touch-mode', 'drag');
+  await page.evaluate(() => window.TalkAgain.show('history'));
+  await page.click('#btn-clear-history');
+  check(await page.locator('#history-confirm').isVisible(), 'En modo deslizar, "Borrar todo" abre la confirmación');
+  await page.click('#btn-clear-no');
+
+  // Deslizar y mantener: tras elegir "Frases", un temblor no elige nada más hasta levantar el dedo
+  await page.evaluate(() => window.TalkAgain.show('settings'));
+  await page.selectOption('#set-touch-mode', 'dwell');
+  await page.evaluate(() => { const r = document.getElementById('set-dwell'); r.value = '0.4'; r.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.evaluate(() => window.TalkAgain.show('home'));
+  const ft = await page.locator('[data-goto="board"]').boundingBox();
+  before = (await page.evaluate(() => window.TalkAgain.history)).length;
+  await page.mouse.move(ft.x + ft.width / 2, ft.y + ft.height / 2); await page.mouse.down(); await page.waitForTimeout(650);
+  check((await page.locator('#view-title').textContent()) === 'Frases', 'Reposo sobre "Frases" abre el tablero');
+  await page.mouse.move(ft.x + ft.width / 2 + 3, ft.y + ft.height / 2 + 3); await page.waitForTimeout(700);
+  hist = await page.evaluate(() => window.TalkAgain.history);
+  check(hist.length === before, 'Un temblor tras cambiar de pantalla no elige nada hasta levantar el dedo');
+  await page.mouse.up();
+  await page.evaluate(() => window.TalkAgain.show('settings'));
+  await page.selectOption('#set-touch-mode', 'tap');
+
+  // Gramática de Armar frase
+  await page.evaluate(() => window.TalkAgain.show('build'));
+  await page.click('#btn-build-new');
+  await page.click('#build-starts [data-start="5"]');
+  await page.click('#build-nexts [data-next="el médico"]');
+  check((await page.locator('#build-sentence').textContent()).trim() === 'Quiero ver al médico', 'Gramática: "Quiero ver al médico"');
+  await page.click('#btn-build-new');
+
   // Historial
   await page.click('#btn-home'); await page.click('[data-goto="history"]');
+  hist = await page.evaluate(() => window.TalkAgain.history);
   check(await page.locator('.hist-item').count() === hist.length, 'Historial lista todas las entradas');
   await page.screenshot({ path: path.join(SHOTS, 'desktop-history.png') });
 
@@ -219,6 +303,33 @@ try {
     await noOverflow(v);
     await mobile.screenshot({ path: path.join(SHOTS, `mobile-${v}.png`) });
   }
+  await mobile.evaluate(() => window.TalkAgain.show('settings'));
+  await mobile.selectOption('#set-scale', '1.6');
+  for (const v of ['home', 'yesno', 'board', 'build', 'spell', 'pain']) {
+    await mobile.evaluate(view => window.TalkAgain.show(view), v);
+    await mobile.waitForTimeout(150);
+    await noOverflow(v + ' con texto enorme');
+  }
+  await mobile.screenshot({ path: path.join(SHOTS, 'mobile-spell-xl.png') });
+  await mobile.evaluate(() => window.TalkAgain.show('board'));
+  await mobile.click('#btn-scan'); await mobile.waitForTimeout(200);
+  await noOverflow('barrido con texto enorme');
+  const sb = await mobile.locator('#btn-scan-select').boundingBox();
+  check(sb && sb.x + sb.width <= 400, 'SELECCIONAR cabe en pantalla con texto enorme');
+  await mobile.screenshot({ path: path.join(SHOTS, 'mobile-scan-xl.png') });
+  await mobile.click('#btn-scan');
+  // Tablet 820 px con texto enorme: Dolor a una columna, sin deformar el selector
+  const tablet = await browser.newPage({ viewport: { width: 820, height: 1180 } });
+  await tablet.goto(BASE, { waitUntil: 'load' });
+  await tablet.evaluate(() => window.TalkAgain.show('settings'));
+  await tablet.selectOption('#set-scale', '1.6');
+  await tablet.evaluate(() => window.TalkAgain.show('pain'));
+  const segBox = await tablet.locator('.seg').first().boundingBox();
+  check(segBox && segBox.height < 120, `Dolor en tablet con texto enorme: selector Delante/Detrás de ${Math.round(segBox ? segBox.height : 0)} px`);
+  await tablet.screenshot({ path: path.join(SHOTS, 'tablet-pain-xl.png') });
+  await tablet.close();
+  await mobile.evaluate(() => window.TalkAgain.show('settings'));
+  await mobile.selectOption('#set-scale', '1.2');
   await mobile.emulateMedia({ colorScheme: 'dark' });
   await mobile.evaluate(() => window.TalkAgain.show('board'));
   await mobile.screenshot({ path: path.join(SHOTS, 'mobile-board-dark.png') });

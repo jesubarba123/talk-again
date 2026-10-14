@@ -29,83 +29,138 @@
   };
 
   const DEFAULT_SETTINGS = {
-    voiceURI: '', rate: 0.95, scale: '1', theme: 'system', keyboardOrder: 'abc',
-    scanInterval: 2, scanLoops: 2, scanSelect: 'screen', scanSpeak: true, scanAuto: false,
+    voiceURI: '', rate: 0.95, scale: '1.2', theme: 'system', keyboardOrder: 'abc', gender: 'm', flashAlert: true,
+    scanInterval: 3, scanLoops: 2, scanSelect: 'screen', scanSpeak: true, scanAuto: false,
     cam: false, camSens: 1, camPreview: true,
     touchMode: 'tap', dwellMs: 900, minTouchMs: 0, dragSpeak: true,
     people: ''
   };
-  let settings = Object.assign({}, DEFAULT_SETTINGS, store.get(KEYS.settings, {}) || {});
-  let vocab = store.get(KEYS.vocab, {}) || {};          // { categoriaId: [items] } sobrescribe los valores por defecto
+  const NUM = { rate: [0.6, 1.3], scanInterval: [0.8, 8], scanLoops: [1, 5], camSens: [0.5, 1.5], dwellMs: [400, 2500], minTouchMs: [0, 0.8] };
+  const ENUM = {
+    theme: ['system', 'light', 'dark'], keyboardOrder: ['abc', 'frecuencia'], scanSelect: ['screen', 'button'],
+    touchMode: ['tap', 'drag', 'dwell'], gender: ['m', 'f'], scale: ['1', '1.2', '1.4', '1.6']
+  };
+  function sanitizeSettings(raw) {
+    const s = Object.assign({}, DEFAULT_SETTINGS);
+    if (!raw || typeof raw !== 'object') return s;
+    Object.keys(DEFAULT_SETTINGS).forEach(k => {
+      if (!(k in raw)) return;
+      const v = raw[k];
+      if (k in NUM) {
+        const n = Number(v);
+        s[k] = Number.isFinite(n) ? Math.min(NUM[k][1], Math.max(NUM[k][0], n)) : DEFAULT_SETTINGS[k];
+      } else if (k in ENUM) {
+        s[k] = ENUM[k].includes(String(v)) ? String(v) : DEFAULT_SETTINGS[k];
+      } else if (typeof DEFAULT_SETTINGS[k] === 'boolean') {
+        s[k] = !!v;
+      } else if (typeof v === 'string') {
+        s[k] = v;
+      }
+    });
+    return s;
+  }
+  function sanitizeVocab(raw) {
+    const out = {};
+    if (!raw || typeof raw !== 'object') return out;
+    D.categories.forEach(c => {
+      const list = raw[c.id];
+      if (!Array.isArray(list)) return;
+      out[c.id] = list.filter(i => i && typeof i === 'object' && typeof i.t === 'string').map(i => {
+        const item = { e: typeof i.e === 'string' ? i.e.slice(0, 8) : '', t: i.t.slice(0, 120) };
+        if (typeof i.s === 'string' && i.s.trim()) item.s = i.s.slice(0, 300);
+        if (i.urgent) item.urgent = true;
+        return item;
+      });
+    });
+    return out;
+  }
+  let settings = sanitizeSettings(store.get(KEYS.settings, {}));
+  let vocab = sanitizeVocab(store.get(KEYS.vocab, {}));   // { categoriaId: [items] } sobrescribe los valores por defecto
   let history = store.get(KEYS.history, []) || [];
-  let learned = store.get(KEYS.words, {}) || {};        // palabra -> veces usada
-  let saved = store.get(KEYS.saved, []) || [];          // frases guardadas desde Deletrear
-  let builderStats = store.get(KEYS.builder, {}) || {}; // uso de continuaciones en Armar frase
+  let learned = store.get(KEYS.words, {}) || {};          // palabra -> veces usada
+  let saved = store.get(KEYS.saved, []) || [];            // frases guardadas
+  let builderStats = store.get(KEYS.builder, {}) || {};   // uso de continuaciones en Armar frase
+  if (!Array.isArray(history)) history = [];
+  if (!Array.isArray(saved)) saved = [];
 
   const saveSettings = () => store.set(KEYS.settings, settings);
+  const saveVocab = () => store.set(KEYS.vocab, vocab);
 
   /* ---------------- Utilidades ---------------- */
   let toastTimer = 0;
   function toast(msg, ms) {
-    const el = $('#toast');
-    el.textContent = msg;
-    el.hidden = false;
+    const t = $('#toast');
+    t.textContent = msg;
+    t.classList.add('is-visible');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { el.hidden = true; }, ms || 2500);
+    toastTimer = setTimeout(() => t.classList.remove('is-visible'), ms || 2500);
   }
-  function flashEl(el) {
-    if (!el) return;
-    el.classList.add('is-flash');
-    setTimeout(() => el.classList.remove('is-flash'), 450);
+  function flashEl(node) {
+    if (!node) return;
+    node.classList.add('is-flash');
+    setTimeout(() => node.classList.remove('is-flash'), 450);
   }
   function stripAccents(s) { return s.normalize('NFD').replace(/[̀-ͯ]/g, ''); }
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  }
+  /* "{o}" → "o" u "a" según la persona */
+  function gen(text) { return String(text || '').replace(/\{o\}/g, settings.gender === 'f' ? 'a' : 'o'); }
   function el(tag, attrs, children) {
     const node = document.createElement(tag);
     if (attrs) Object.keys(attrs).forEach(k => {
       if (k === 'class') node.className = attrs[k];
       else if (k === 'text') node.textContent = attrs[k];
-      else if (k.startsWith('data-')) node.setAttribute(k, attrs[k]);
+      else if (k.startsWith('data-') || k.startsWith('aria-') || k === 'role' || k === 'style') node.setAttribute(k, attrs[k]);
       else if (k in node) node[k] = attrs[k];
       else node.setAttribute(k, attrs[k]);
     });
     (children || []).forEach(c => node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c));
     return node;
   }
+  function peopleNames() {
+    return (settings.people || '').split('\n').map(s => s.trim()).filter(Boolean);
+  }
 
   /* ---------------- Voz ---------------- */
   const speech = {
+    supported: 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window,
     voices: [],
+    utt: null,            // última locución (evita que el navegador la descarte y ata sus eventos)
+    seq: 0,               // número de orden: una locución pendiente ya superada no se dice
+    pendingTimer: 0,
     contentSpeaking: false,
     unlocked: false,
-    /* iOS solo permite hablar tras un toque del usuario: el primer toque "desbloquea" la voz. */
+    init() {
+      if (!this.supported) { renderVoiceSelect(); return; }
+      const load = () => { this.refreshVoices(); renderVoiceSelect(); };
+      load();
+      try { speechSynthesis.addEventListener('voiceschanged', load); } catch (e) { speechSynthesis.onvoiceschanged = load; }
+      setTimeout(load, 800);
+      setTimeout(load, 3000);
+    },
+    refreshVoices() {
+      try { const v = speechSynthesis.getVoices() || []; if (v.length) this.voices = v; } catch (e) { /* nada */ }
+      return this.voices;
+    },
+    spanishVoices() {
+      if (!this.voices.length) this.refreshVoices();
+      return this.voices.filter(v => /^es([-_]|$)/i.test(v.lang));
+    },
+    pickVoice() {
+      const es = this.spanishVoices();
+      if (settings.voiceURI) {
+        const chosen = this.voices.find(x => x.voiceURI === settings.voiceURI);
+        if (chosen) return chosen;
+      }
+      if (!es.length) return null;
+      const local = es.filter(v => v.localService !== false);   // las voces "de red" se quedan mudas sin internet
+      const pool = local.length ? local : es;
+      const nav = (navigator.language || '').toLowerCase().replace('_', '-');
+      return pool.find(v => v.lang.toLowerCase().replace('_', '-') === nav) || pool.find(v => v.default) || pool[0];
+    },
+    /* iOS solo permite hablar tras un gesto real del usuario: el primero "desbloquea" la voz. */
     unlock() {
       if (this.unlocked || !this.supported) return;
       this.unlocked = true;
       try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) { /* nada */ }
-    },
-    supported: 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window,
-    init() {
-      if (!this.supported) { renderVoiceSelect(); return; }
-      const load = () => { this.voices = speechSynthesis.getVoices() || []; renderVoiceSelect(); };
-      load();
-      try { speechSynthesis.addEventListener('voiceschanged', load); } catch (e) { speechSynthesis.onvoiceschanged = load; }
-      // Algunos navegadores tardan en cargar las voces.
-      setTimeout(load, 800);
-    },
-    spanishVoices() { return this.voices.filter(v => /^es([-_]|$)/i.test(v.lang)); },
-    pickVoice() {
-      if (!this.voices.length) return null;
-      if (settings.voiceURI) {
-        const v = this.voices.find(x => x.voiceURI === settings.voiceURI);
-        if (v) return v;
-      }
-      const es = this.spanishVoices();
-      if (!es.length) return null;
-      const nav = (navigator.language || '').toLowerCase().replace('_', '-');
-      return es.find(v => v.lang.toLowerCase().replace('_', '-') === nav) || es.find(v => v.default) || es[0];
     },
     say(text, opts) {
       opts = opts || {};
@@ -113,26 +168,35 @@
       if (!this.supported) { toast('Este navegador no tiene voz. Usa Chrome, Safari o Edge.'); return; }
       try {
         if (opts.scan && this.contentSpeaking) return;   // una etiqueta del barrido nunca corta una frase
-        const wasSpeaking = speechSynthesis.speaking || speechSynthesis.pending;
-        speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
         const v = this.pickVoice();
-        if (v) { u.voice = v; u.lang = v.lang; } else { u.lang = 'es'; }
+        const nav = (navigator.language || '').toLowerCase();
+        if (v) { u.voice = v; u.lang = v.lang; } else { u.lang = nav.startsWith('es') ? navigator.language : 'es-ES'; }
         u.rate = opts.rate || settings.rate;
         u.pitch = 1;
-        u.volume = opts.volume == null ? 1 : opts.volume;
+        u.volume = 1;
+        this.utt = u;
+        const seq = ++this.seq;
+        clearTimeout(this.pendingTimer);
         if (!opts.scan) {
           this.contentSpeaking = true;
-          const done = () => { this.contentSpeaking = false; };
+          const done = () => { if (this.utt === u) this.contentSpeaking = false; };
           u.onend = done; u.onerror = done;
           setTimeout(done, 8000);
         }
-        // En Android Chrome, hablar justo después de cancelar pierde la frase: se espera un instante.
-        if (wasSpeaking) setTimeout(() => { try { speechSynthesis.speak(u); } catch (e) { /* nada */ } }, 60);
-        else speechSynthesis.speak(u);
+        const busy = speechSynthesis.speaking || speechSynthesis.pending;
+        if (busy) speechSynthesis.cancel();
+        const go = () => { if (seq === this.seq) { try { speechSynthesis.speak(u); } catch (e) { /* nada */ } } };
+        // Hablar justo después de cancelar pierde la frase en Android: se espera un instante.
+        if (busy) this.pendingTimer = setTimeout(go, 150); else go();
       } catch (e) { console.warn('speech', e); }
     },
-    stop() { if (this.supported) { try { speechSynthesis.cancel(); } catch (e) { /* nada */ } } }
+    stop() {
+      this.seq++;
+      clearTimeout(this.pendingTimer);
+      this.contentSpeaking = false;
+      if (this.supported) { try { speechSynthesis.cancel(); } catch (e) { /* nada */ } }
+    }
   };
 
   function renderVoiceSelect() {
@@ -142,16 +206,16 @@
     sel.innerHTML = '';
     if (!speech.supported) {
       sel.appendChild(el('option', { value: '', text: 'Sin voz disponible' }));
-      note.textContent = 'Este navegador no puede leer en voz alta. Prueba con Chrome, Safari o Edge.';
+      note.textContent = 'Este navegador no puede leer en voz alta. Prueben con Chrome, Safari o Edge.';
       return;
     }
     const es = speech.spanishVoices();
     sel.appendChild(el('option', { value: '', text: es.length ? 'Automática (español)' : 'Predeterminada del dispositivo' }));
-    es.forEach(v => sel.appendChild(el('option', { value: v.voiceURI, text: `${v.name} (${v.lang})` })));
+    es.forEach(v => sel.appendChild(el('option', { value: v.voiceURI, text: `${v.name} (${v.lang})${v.localService === false ? ' — necesita internet' : ''}` })));
     sel.value = settings.voiceURI && es.some(v => v.voiceURI === settings.voiceURI) ? settings.voiceURI : '';
     note.textContent = es.length
       ? `${es.length} voz${es.length === 1 ? '' : 'es'} en español en este dispositivo.`
-      : 'No se encontraron voces en español. En Android, instala «Síntesis de voz de Google» y añade español; en iPhone/iPad, Ajustes → Accesibilidad → Contenido hablado → Voces.';
+      : 'No se encontraron voces en español. En Android, instalen la app de voz de Google («Speech Recognition & Synthesis», antes «Síntesis de voz de Google») y agreguen español; en iPhone/iPad: Configuración → Accesibilidad → Contenido hablado → Voces → Español.';
   }
 
   /* ---------------- Historial ---------------- */
@@ -200,7 +264,6 @@
       await navigator.clipboard.writeText(text);
       toast(okMsg || 'Copiado');
     } catch (e) {
-      // Alternativa: seleccionar en un área de texto temporal.
       const ta = el('textarea', { value: text, style: 'position:fixed;left:-9999px' });
       document.body.appendChild(ta); ta.select();
       let ok = false;
@@ -225,7 +288,9 @@
     if (view === 'pain') renderPain();
     if (view === 'history') renderHistory();
     if (view === 'settings') renderSettings();
+    touch.release();          // un dedo que sigue apoyado no elige nada en la pantalla nueva
     scanner.refresh();
+    try { $('#view-title').focus({ preventScroll: true }); } catch (e) { /* nada */ }
   }
 
   /* ---------------- Aviso de ayuda ---------------- */
@@ -235,7 +300,7 @@
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return;
       audioCtx = audioCtx || new Ctx();
-      if (audioCtx.state === 'suspended') audioCtx.resume();
+      if (audioCtx.state !== 'running') audioCtx.resume();
       const now = audioCtx.currentTime;
       for (let i = 0; i < 6; i++) {
         const o = audioCtx.createOscillator();
@@ -253,18 +318,40 @@
   }
   function help() {
     alarm();
-    const flash = $('#flash');
-    flash.hidden = false;
-    setTimeout(() => { flash.hidden = true; }, 4000);
+    if (settings.flashAlert) {
+      const flash = $('#flash');
+      flash.hidden = false;
+      setTimeout(() => { flash.hidden = true; }, 4000);
+    }
     speech.say('¡Necesito ayuda, por favor!');
     addHistory('help', '¡Necesito ayuda!');
     toast('Aviso de AYUDA');
   }
 
+  /* ---------------- Pantalla siempre encendida mientras se usa barrido o deslizar ---------------- */
+  const wake = {
+    lock: null, want: false,
+    async request() {
+      this.want = true;
+      if (!('wakeLock' in navigator) || this.lock) return;
+      try {
+        this.lock = await navigator.wakeLock.request('screen');
+        this.lock.addEventListener('release', () => { this.lock = null; });
+      } catch (e) { this.lock = null; }
+    },
+    release() {
+      this.want = false;
+      if (this.lock) { try { this.lock.release(); } catch (e) { /* nada */ } this.lock = null; }
+    }
+  };
+  function updateWake() {
+    if (scanner.active || settings.touchMode !== 'tap') wake.request(); else wake.release();
+  }
+
   /* ---------------- Barrido (escaneo) ---------------- */
   const scanner = {
     active: false,
-    state: 'running',   // running | idle (pausa automática) | paused (pausa manual)
+    state: 'running',   // running | idle (pausa automática) | paused (pausa del acompañante)
     timer: 0,
     suspendUntil: 0,
     activating: false,
@@ -274,12 +361,15 @@
     start() {
       this.active = true;
       this.state = 'running';
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
       document.body.classList.add('is-scanning');
       document.body.classList.toggle('select-screen', settings.scanSelect === 'screen');
       $('#scanbar').hidden = false;
+      $('#scan-status').setAttribute('aria-live', settings.scanSpeak ? 'off' : 'polite');
       const b = $('#btn-scan'); b.setAttribute('aria-pressed', 'true'); b.textContent = '⏹ Barrido';
       $('#btn-scan-pause').textContent = '⏸ Pausa';
       touch.apply();
+      updateWake();
       this.refresh();
     },
     stop() {
@@ -290,6 +380,7 @@
       $('#scanbar').hidden = true;
       const b = $('#btn-scan'); b.setAttribute('aria-pressed', 'false'); b.textContent = '▶ Barrido';
       touch.apply();
+      updateWake();
     },
     toggle() { if (this.active) this.stop(); else this.start(); },
     status(msg) { $('#scan-status').textContent = msg; },
@@ -324,7 +415,6 @@
       explicit.forEach(items => rows.push(items));
       rows.forEach(r => r.sort((a, b) => left(a) - left(b)));
       rows.sort((a, b) => Math.min(...a.map(top)) - Math.min(...b.map(top)));
-      // Si hay pocas opciones, barrido lineal sin filas.
       const total = rows.reduce((n, r) => n + r.length, 0);
       this.groups = (total <= 8 || rows.length === 1) ? [rows.flat()] : rows;
     },
@@ -336,11 +426,12 @@
       if (wait > 0) { this.timer = setTimeout(() => this.refresh(), wait); return; }
       this.clearHl();
       this.collect();
+      if (this.state === 'paused') return;     // la pausa del acompañante sobrevive a los cambios de pantalla
       this.level = this.groups.length === 1 ? 1 : 0;
       this.gi = 0; this.ii = 0; this.loops = 0;
       this.state = 'running';
       $('#btn-scan-pause').textContent = '⏸ Pausa';
-      if (!this.groups.length || !this.groups[0].length) { this.status('No hay opciones que barrer en esta pantalla'); return; }
+      if (!this.groups.length || !this.groups[0].length) { this.status('Nada que barrer aquí. Toca para volver al inicio.'); return; }
       this.step();
     },
 
@@ -354,7 +445,7 @@
         try { g[0].scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) { /* nada */ }
         const label = `Fila ${this.gi + 1} de ${this.groups.length}`;
         this.status(label + ' · toca para entrar');
-        if (settings.scanSpeak) speech.say(label, { scan: true, rate: Math.min(1.5, settings.rate + 0.25) });
+        if (settings.scanSpeak) speech.say(label, { scan: true });
       } else {
         const e = this.current();
         if (!e) { this.refresh(); return; }
@@ -362,7 +453,7 @@
         try { e.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (err) { /* nada */ }
         const label = labelOf(e);
         this.status(label);
-        if (settings.scanSpeak) speech.say(label, { scan: true, rate: Math.min(1.5, settings.rate + 0.25) });
+        if (settings.scanSpeak) speech.say(label, { scan: true });
       }
       this.timer = setTimeout(() => this.advance(), settings.scanInterval * 1000);
     },
@@ -375,10 +466,7 @@
         this.ii++;
         if (this.ii >= this.groups[this.gi].length) { this.ii = 0; this.loops++; }
       }
-      if (!manual && this.loops >= Number(settings.scanLoops)) {
-        this.idle();
-        return;
-      }
+      if (!manual && this.loops >= Number(settings.scanLoops)) { this.idle(); return; }
       this.step();
     },
     retreat() {
@@ -390,7 +478,7 @@
       this.state = 'idle';
       clearTimeout(this.timer);
       this.clearHl();
-      this.status('En espera. Toca, pulsa o asiente para seguir.');
+      this.status('En espera. Toca, presiona el pulsador o asiente para seguir.');
       speech.stop();
     },
     pauseToggle() {
@@ -399,7 +487,7 @@
       this.state = 'paused';
       clearTimeout(this.timer);
       this.clearHl();
-      this.status('Pausado por el acompañante. La pantalla se usa de forma normal.');
+      this.status('Pausado por el acompañante: la pantalla se usa de forma normal.');
       $('#btn-scan-pause').textContent = '▶ Seguir';
       speech.stop();
     },
@@ -409,7 +497,7 @@
       this.loops = 0;
       $('#btn-scan-pause').textContent = '⏸ Pausa';
       this.collect();
-      if (!this.groups.length || !this.groups[0].length) { this.status('No hay opciones que barrer en esta pantalla'); return; }
+      if (!this.groups.length || !this.groups[0].length) { this.status('Nada que barrer aquí. Toca para volver al inicio.'); return; }
       this.level = this.groups.length === 1 ? 1 : 0;
       this.gi = Math.min(this.gi, this.groups.length - 1);
       this.ii = 0;
@@ -418,11 +506,13 @@
     select() {
       if (!this.active || Date.now() < this.suspendUntil) return;
       if (this.state !== 'running') { this.resume(); return; }
+      if (!this.groups.length || !this.groups[0].length) { this.back(); return; }
       clearTimeout(this.timer);
       if (this.level === 0) {
         const g = this.groups[this.gi];
         if (g.length === 1) { this.activate(g[0]); return; }
         this.level = 1; this.ii = 0; this.loops = 0;
+        this.suspendUntil = Date.now() + 400;   // un pulsador mantenido no elige la primera opción sin querer
         this.step();
         return;
       }
@@ -453,14 +543,16 @@
   };
 
   function labelOf(e) {
-    return e.getAttribute('data-label') || e.getAttribute('aria-label') || (e.textContent || '').trim().replace(/\s+/g, ' ');
+    return e.getAttribute('data-label') || e.getAttribute('aria-label') || e.getAttribute('data-say') || (e.textContent || '').trim().replace(/\s+/g, ' ');
   }
 
   /* ---------------- Sí / No ---------------- */
   function answer(text, say, sourceEl) {
-    const q = ($('#question-input').value || '').trim();
+    const input = $('#question-input');
+    const q = (input.value || '').trim();
     speech.say(say || text);
     addHistory('answer', text, q ? { q } : {});
+    input.value = '';   // la pregunta no se arrastra a las respuestas siguientes
     flashEl(sourceEl || $(`[data-answer="${text}"]`));
     toast(text, 1800);
   }
@@ -471,10 +563,13 @@
   function itemsOf(catId) {
     const cat = categoryById(catId);
     if (!cat) return [];
-    let items = Array.isArray(vocab[catId]) ? vocab[catId] : cat.items;
+    let items = (Array.isArray(vocab[catId]) ? vocab[catId] : cat.items).map(i => Object.assign({}, i, { t: gen(i.t), s: i.s ? gen(i.s) : undefined }));
     if (catId === 'personas') {
-      const names = (settings.people || '').split('\n').map(s => s.trim()).filter(Boolean)
-        .map(n => ({ e: '👤', t: n, s: 'Quiero ver a ' + n }));
+      const names = [];
+      peopleNames().forEach(n => {
+        names.push({ e: '👤', t: `Ver a ${n}`, s: `Quiero ver a ${n}` });
+        names.push({ e: '📞', t: `Llamar a ${n}`, s: `Llamen a ${n}, por favor` });
+      });
       items = names.concat(items);
     }
     return items;
@@ -485,7 +580,7 @@
       type: 'button', 'data-scan': '', 'data-label': item.t, 'data-say': item.s || item.t
     }, extraAttrs || {});
     const children = [];
-    if (item.e) children.push(el('span', { class: 'tile-emoji', text: item.e }));
+    if (item.e) children.push(el('span', { class: 'tile-emoji', 'aria-hidden': 'true', text: item.e }));
     children.push(el('span', { class: 'tile-text', text: item.t }));
     return el('button', attrs, children);
   }
@@ -493,10 +588,11 @@
     const strip = $('#board-cats');
     strip.innerHTML = '';
     D.categories.forEach(c => {
+      const active = c.id === currentCat;
       strip.appendChild(el('button', {
-        class: 'cat-btn ' + c.k + (c.id === currentCat ? ' is-active' : ''),
-        type: 'button', 'data-scan': '', 'data-cat': c.id, 'data-label': c.name, text: `${c.emoji} ${c.name}`
-      }));
+        class: 'cat-btn ' + c.k + (active ? ' is-active' : ''),
+        type: 'button', 'data-scan': '', 'data-cat': c.id, 'data-label': c.name, 'aria-pressed': active ? 'true' : 'false'
+      }, [el('span', { 'aria-hidden': 'true', text: c.emoji + ' ' }), c.name]));
     });
     const grid = $('#board-grid');
     grid.innerHTML = '';
@@ -504,14 +600,10 @@
     itemsOf(currentCat).forEach(item => { if (item.t) grid.appendChild(makeTile(item, cat.k)); });
   }
 
-  function peopleNames() {
-    return (settings.people || '').split('\n').map(s => s.trim()).filter(Boolean);
-  }
-
   /* ---------------- Armar frase ---------------- */
   const build = { start: null, next: null, mods: [] };
   function builderNexts(start) {
-    let list = start.next.slice();
+    let list = start.next.map(gen);
     if (start.people) list = peopleNames().concat(list);
     const stats = builderStats[start.t] || {};
     return list.map((t, i) => ({ t, i, n: stats[t] || 0 })).sort((a, b) => b.n - a.n || a.i - b.i).map(x => x.t);
@@ -526,7 +618,7 @@
       s += ' ' + build.mods.join(' ');
       if (q) s += '?';
     }
-    return s;
+    return s.replace(/\ba el\b/g, 'al');
   }
   function renderBuild() {
     $('#build-sentence').textContent = buildSentence();
@@ -545,7 +637,8 @@
     const mods = $('#build-mods');
     mods.innerHTML = '';
     D.builder.modifiers.forEach(m => mods.appendChild(makeTile({ t: m }, 'k-feel', {
-      'data-mod': m, class: 'tile tile-textonly k-feel' + (build.mods.includes(m) ? ' is-selected' : '')
+      'data-mod': m, class: 'tile tile-textonly k-feel' + (build.mods.includes(m) ? ' is-selected' : ''),
+      'aria-pressed': build.mods.includes(m) ? 'true' : 'false'
     })));
   }
   function buildSpeak() {
@@ -558,15 +651,14 @@
 
   /* ---------------- Tacto: deslizar para elegir ---------------- */
   const touch = {
-    pointerId: null, startAt: 0, lastDuration: 0, current: null, dwellTimer: 0, activating: false,
+    pointerId: null, startAt: 0, lastDuration: 0, current: null, dwellTimer: 0, activating: false, needsLift: false,
     enabled() { return settings.touchMode !== 'tap' && !scanner.active; },
     apply() {
       const on = settings.touchMode !== 'tap' && !scanner.active;
       document.body.classList.toggle('touch-drag', on);
       $('#dragbar').hidden = !on;
       document.documentElement.style.setProperty('--dwell-ms', Math.round(settings.dwellMs) + 'ms');
-      if (on) this.status('');
-      else this.release();
+      if (on) this.status(''); else this.release();
     },
     status(txt) {
       $('#drag-status').textContent = txt || (settings.touchMode === 'dwell'
@@ -583,13 +675,15 @@
       if (!e.isPrimary) return;
       this.startAt = performance.now();
       if (!this.enabled() || currentView === 'settings') return;
-      if (e.target.closest('input, select, textarea, label, a')) return;
+      // Los botones normales (Copiar, Leer, ✕…) siguen funcionando con un toque corriente.
+      if (e.target.closest('input, select, textarea, label, a, summary, button:not([data-scan])')) return;
       this.pointerId = e.pointerId;
+      this.needsLift = false;
       try { $('#views').setPointerCapture(e.pointerId); } catch (err) { /* nada */ }
       this.enter(this.targetAt(e.clientX, e.clientY));
     },
     move(e) {
-      if (this.pointerId !== e.pointerId) return;
+      if (this.pointerId !== e.pointerId || this.needsLift) return;
       const t = this.targetAt(e.clientX, e.clientY);
       if (t !== this.current) this.enter(t);
     },
@@ -601,7 +695,7 @@
       t.classList.add('drag-hl');
       const label = labelOf(t);
       this.status(label);
-      if (settings.dragSpeak) speech.say(label, { scan: true, rate: Math.min(1.5, settings.rate + 0.25) });
+      if (settings.dragSpeak) speech.say(label, { scan: true });
       if (settings.touchMode === 'dwell') {
         t.classList.add('dwell-anim');
         this.dwellTimer = setTimeout(() => { t.classList.remove('dwell-anim'); this.fire(t); }, settings.dwellMs);
@@ -612,8 +706,9 @@
       if (this.pointerId !== e.pointerId) return;
       const t = this.current;
       const dur = this.lastDuration;
+      const lifted = this.needsLift;
       this.release();
-      if (settings.touchMode === 'drag' && t && dur >= settings.minTouchMs * 1000) this.fire(t);
+      if (settings.touchMode === 'drag' && t && !lifted && dur >= settings.minTouchMs * 1000) this.fire(t);
     },
     cancel(e) { if (this.pointerId === e.pointerId) this.release(); },
     release() {
@@ -621,10 +716,12 @@
       if (this.current) this.current.classList.remove('drag-hl', 'dwell-anim');
       this.current = null;
       this.pointerId = null;
+      this.needsLift = false;
       if (settings.touchMode !== 'tap') this.status('');
     },
     fire(t) {
       flashEl(t);
+      if (settings.touchMode === 'dwell') this.needsLift = true;   // hasta levantar el dedo no se elige otra cosa
       this.activating = true;
       try {
         if (typeof t.click === 'function') t.click();
@@ -639,20 +736,29 @@
   function renderOutput() {
     const out = $('#spell-output');
     out.textContent = spellText;
-    if (spellText) out.appendChild(el('span', { class: 'caret' }));
+    if (spellText) out.appendChild(el('span', { class: 'caret', 'aria-hidden': 'true' }));
+  }
+  function keyboardRows() {
+    const letters = D.keyboardOrder[settings.keyboardOrder] || D.keyboardOrder.abc;
+    const per = window.innerWidth < 560 ? 5 : 7;   // teclas más grandes en teléfono
+    const rows = [];
+    for (let i = 0; i < letters.length; i += per) rows.push(letters.slice(i, i + per));
+    return { rows, per };
   }
   function renderKeyboard() {
     const kb = $('#spell-keyboard');
     kb.innerHTML = '';
     kb.setAttribute('data-scan-scope', '');
-    kb.id = 'spell-keyboard';
-    const rows = D.keyboardRows[settings.keyboardOrder] || D.keyboardRows.abc;
+    const { rows, per } = keyboardRows();
     rows.forEach((row, ri) => {
-      const r = el('div', { class: 'key-row' });
-      row.forEach(ch => r.appendChild(el('button', {
-        class: 'key', type: 'button', 'data-scan': '', 'data-row': String(ri), 'data-key': ch,
-        'data-label': ch === '´' ? 'tilde' : ch, text: ch
-      })));
+      const r = el('div', { class: 'key-row', style: `--cols: ${per}` });
+      row.forEach(ch => {
+        const key = el('button', {
+          class: 'key', type: 'button', 'data-scan': '', 'data-row': String(ri), 'data-key': ch,
+          'data-label': ch === '´' ? 'tilde' : ch
+        }, ch === '´' ? [el('span', { text: '´' }), el('span', { class: 'key-sub', 'aria-hidden': 'true', text: 'tilde' })] : [ch]);
+        r.appendChild(key);
+      });
       kb.appendChild(r);
     });
     const actions = el('div', { class: 'key-row key-row-actions' });
@@ -702,8 +808,8 @@
     row.innerHTML = '';
     saved.forEach((s, i) => {
       const chip = el('span', { class: 'saved-chip' });
-      chip.appendChild(el('button', { class: 'saved-say btn-plain', type: 'button', 'data-scan': '', 'data-saved': String(i), 'data-label': s, text: s, style: 'border:0;background:transparent;padding:0;font:inherit;color:inherit;text-align:left' }));
-      chip.appendChild(el('button', { class: 'saved-del', type: 'button', 'data-del-saved': String(i), 'aria-label': 'Quitar frase guardada', text: '✕' }));
+      chip.appendChild(el('button', { class: 'saved-say', type: 'button', 'data-scan': '', 'data-saved': String(i), 'data-label': s, text: s }));
+      chip.appendChild(el('button', { class: 'saved-del', type: 'button', 'data-del-saved': String(i), 'aria-label': 'Quitar la frase guardada ' + s, text: '✕' }));
       row.appendChild(chip);
     });
   }
@@ -714,19 +820,20 @@
     store.set(KEYS.words, learned);
   }
   function accentLast() {
-    const map = { a: 'á', e: 'é', i: 'í', o: 'ó', u: 'ú', A: 'Á', E: 'É', I: 'Í', O: 'Ó', U: 'Ú' };
+    const map = { a: 'á', e: 'é', i: 'í', o: 'ó', u: 'ú' };
     const last = spellText.slice(-1);
     if (map[last]) spellText = spellText.slice(0, -1) + map[last];
   }
+  function announce(text) { const sr = $('#spell-sr'); if (sr) sr.textContent = text; }
   function spellKey(ch) {
-    if (ch === '´') { accentLast(); }
-    else { spellText += ch.toLowerCase(); }
+    if (ch === '´') { accentLast(); announce('tilde'); }
+    else { spellText += ch.toLowerCase(); announce(ch); }
     renderOutput(); renderPredictions();
   }
   function spellAction(a) {
-    if (a === 'space') { if (spellText && !spellText.endsWith(' ')) { learnWords(currentWordPrefix()); spellText += ' '; } }
-    else if (a === 'back') { spellText = spellText.slice(0, -1); }
-    else if (a === 'clear') { spellText = ''; }
+    if (a === 'space') { if (spellText && !spellText.endsWith(' ')) { learnWords(currentWordPrefix()); spellText += ' '; announce('espacio'); } }
+    else if (a === 'back') { spellText = spellText.slice(0, -1); announce('borrar'); }
+    else if (a === 'clear') { spellText = ''; announce('borrado todo'); }
     else if (a === 'speak') {
       const t = spellText.trim();
       if (!t) { toast('No hay nada escrito todavía'); return; }
@@ -745,10 +852,23 @@
   let painSide = 'front', painPart = null;
   const BODY_ROWS = {
     cabeza: 0, nuca: 0, cuello: 0, cuello_atras: 0,
+    hombro_der: 1, hombro_izq: 1, hombro_izq_atras: 1, hombro_der_atras: 1,
     pecho: 1, espalda_alta: 1, brazo_der: 1, brazo_izq: 1, brazo_izq_atras: 1, brazo_der_atras: 1,
     estomago: 2, espalda_baja: 2, pelvis: 2, gluteos: 2, mano_der: 2, mano_izq: 2, mano_izq_atras: 2, mano_der_atras: 2,
     pierna_der: 3, pierna_izq: 3, pierna_izq_atras: 3, pierna_der_atras: 3, pie_der: 3, pie_izq: 3, talon_izq: 3, talon_der: 3
   };
+  function svgShape(ns, p, pad, cls) {
+    let shape;
+    if (p.shape === 'ellipse') {
+      shape = document.createElementNS(ns, 'ellipse');
+      shape.setAttribute('cx', p.cx); shape.setAttribute('cy', p.cy); shape.setAttribute('rx', p.rx + pad); shape.setAttribute('ry', p.ry + pad);
+    } else {
+      shape = document.createElementNS(ns, 'rect');
+      shape.setAttribute('x', p.x - pad); shape.setAttribute('y', p.y - pad); shape.setAttribute('width', p.w + pad * 2); shape.setAttribute('height', p.h + pad * 2); shape.setAttribute('rx', (p.r || 8) + pad);
+    }
+    shape.setAttribute('class', cls);
+    return shape;
+  }
   function renderBodyMap() {
     const svg = $('#body-map');
     svg.innerHTML = '';
@@ -764,30 +884,24 @@
         g.setAttribute('data-row', 'b' + (BODY_ROWS[p.id] != null ? BODY_ROWS[p.id] : 9));
         g.setAttribute('data-part', p.id);
         g.setAttribute('data-say', p.say);
-        g.setAttribute('data-label', p.label);
+        g.setAttribute('data-label', p.spoken || p.label);
         g.setAttribute('tabindex', '0');
         g.setAttribute('role', 'button');
-        g.setAttribute('aria-label', p.label);
+        g.setAttribute('aria-label', p.spoken || p.label);
+        g.setAttribute('aria-pressed', p.id === painPart ? 'true' : 'false');
         if (p.id === painPart) g.classList.add('is-selected');
-        let shape;
-        if (p.shape === 'ellipse') {
-          shape = document.createElementNS(ns, 'ellipse');
-          shape.setAttribute('cx', p.cx); shape.setAttribute('cy', p.cy); shape.setAttribute('rx', p.rx); shape.setAttribute('ry', p.ry);
-        } else {
-          shape = document.createElementNS(ns, 'rect');
-          shape.setAttribute('x', p.x); shape.setAttribute('y', p.y); shape.setAttribute('width', p.w); shape.setAttribute('height', p.h); shape.setAttribute('rx', p.r || 8);
-        }
-        shape.setAttribute('class', 'part');
-        g.appendChild(shape);
+        g.appendChild(svgShape(ns, p, 7, 'hit'));    // zona de toque ampliada (invisible)
+        g.appendChild(svgShape(ns, p, 0, 'part'));
         const label = document.createElementNS(ns, 'text');
         const cx = p.shape === 'ellipse' ? p.cx : p.x + p.w / 2;
         const cy = p.shape === 'ellipse' ? p.cy : p.y + p.h / 2;
-        label.setAttribute('x', cx); label.setAttribute('y', cy + 4); label.setAttribute('text-anchor', 'middle');
+        label.setAttribute('x', cx); label.setAttribute('y', cy + 4.5); label.setAttribute('text-anchor', 'middle');
         const words = p.label.split(' ');
-        if (words.length > 1 && (p.w == null || p.w < 60)) {
+        const narrow = p.shape === 'ellipse' ? p.rx < 30 : p.w < 60;
+        if (words.length > 1 && narrow) {
           label.setAttribute('y', cy - 2);
           const t1 = document.createElementNS(ns, 'tspan'); t1.setAttribute('x', cx); t1.textContent = words[0];
-          const t2 = document.createElementNS(ns, 'tspan'); t2.setAttribute('x', cx); t2.setAttribute('dy', '12'); t2.textContent = words.slice(1).join(' ');
+          const t2 = document.createElementNS(ns, 'tspan'); t2.setAttribute('x', cx); t2.setAttribute('dy', '14'); t2.textContent = words.slice(1).join(' ');
           label.appendChild(t1); label.appendChild(t2);
         } else {
           label.textContent = p.label;
@@ -797,8 +911,10 @@
       });
       svg.appendChild(group);
     });
-    $$('.seg-btn').forEach(b => {
-      b.classList.toggle('is-active', b.dataset.side === painSide);
+    $$('.seg-btn[data-side]').forEach(b => {
+      const active = b.dataset.side === painSide;
+      b.classList.toggle('is-active', active);
+      b.setAttribute('aria-pressed', active ? 'true' : 'false');
       b.setAttribute('data-scan', '');
       b.setAttribute('data-row', 'side');
       b.setAttribute('data-label', b.textContent.trim());
@@ -809,14 +925,14 @@
     wrap.innerHTML = '';
     for (let n = 0; n <= 10; n++) {
       wrap.appendChild(el('button', {
-        class: 'level', type: 'button', 'data-scan': '', 'data-level': String(n), 'data-label': `dolor ${n}`
-      }, [el('span', { class: 'level-face', text: D.painFaces[n] }), el('span', { text: String(n) })]));
+        class: 'level', type: 'button', 'data-scan': '', 'data-level': String(n), 'data-label': `dolor ${n}, ${D.painLabels[n]}`, 'aria-pressed': 'false'
+      }, [el('span', { class: 'level-face', 'aria-hidden': 'true', text: D.painFaces[n] }), el('span', { text: String(n) })]));
     }
   }
   function renderQuick() {
     const wrap = $('#pain-quick');
     wrap.innerHTML = '';
-    D.painQuick.forEach(item => wrap.appendChild(makeTile(item, 'k-health')));
+    D.painQuick.forEach(item => wrap.appendChild(makeTile(Object.assign({}, item, { t: gen(item.t), s: item.s ? gen(item.s) : undefined }), 'k-health')));
   }
   function renderPain() { renderBodyMap(); renderLevels(); renderQuick(); }
   function partById(id) { return D.body.front.concat(D.body.back).find(p => p.id === id); }
@@ -828,13 +944,25 @@
     else document.documentElement.removeAttribute('data-theme');
     document.body.classList.toggle('select-screen', scanner.active && settings.scanSelect === 'screen');
     touch.apply();
+    updateWake();
   }
+  function rateLabel(r) {
+    r = Number(r);
+    const word = r < 0.85 ? 'Lenta' : r <= 1.05 ? 'Normal' : 'Rápida';
+    return `${word} (${r.toFixed(2).replace('.', ',')})`;
+  }
+  function sensLabel(v) { v = Number(v); return v < 0.8 ? 'Baja (gestos amplios)' : v > 1.2 ? 'Alta (gestos pequeños)' : 'Media'; }
   function renderSettings() {
     renderVoiceSelect();
-    $('#set-rate').value = settings.rate; $('#set-rate-out').textContent = Number(settings.rate).toFixed(2).replace('.', ',');
+    $('#set-rate').value = settings.rate; $('#set-rate-out').textContent = rateLabel(settings.rate);
     $('#set-scale').value = String(settings.scale);
     $('#set-theme').value = settings.theme;
-    const ko = $('#set-keyboard-order'); if (ko) ko.value = settings.keyboardOrder;
+    $$('[data-gender]').forEach(b => {
+      const on = b.dataset.gender === settings.gender;
+      b.classList.toggle('is-active', on); b.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+    $('#set-keyboard-order').value = settings.keyboardOrder;
+    $('#set-flash').checked = !!settings.flashAlert;
     $('#set-touch-mode').value = settings.touchMode;
     $('#set-dwell').value = settings.dwellMs / 1000; $('#set-dwell-out').textContent = (settings.dwellMs / 1000).toFixed(1).replace('.', ',');
     $('#set-min-touch').value = settings.minTouchMs; $('#set-min-touch-out').textContent = Number(settings.minTouchMs).toFixed(2).replace('.', ',');
@@ -851,7 +979,6 @@
     renderEditor();
     $('#backup-text').value = exportBackup();
   }
-  function sensLabel(v) { v = Number(v); return v < 0.8 ? 'Baja (gestos amplios)' : v > 1.2 ? 'Alta (gestos pequeños)' : 'Media'; }
 
   function renderEditor() {
     const sel = $('#edit-cat');
@@ -867,8 +994,13 @@
     items.forEach((item, i) => {
       const row = el('div', { class: 'edit-row' });
       row.appendChild(el('input', { class: 'edit-emoji', type: 'text', value: item.e || '', 'aria-label': 'Emoji', 'data-idx': String(i), 'data-field': 'e', maxLength: 8 }));
-      row.appendChild(el('input', { class: 'edit-text', type: 'text', value: item.t || '', 'aria-label': 'Frase', 'data-idx': String(i), 'data-field': 't', placeholder: 'Frase' }));
-      row.appendChild(el('button', { class: 'edit-del', type: 'button', 'data-del': String(i), 'aria-label': 'Quitar frase', text: '🗑' }));
+      row.appendChild(el('input', { class: 'edit-text', type: 'text', value: gen(item.t || ''), 'aria-label': 'Texto del botón', 'data-idx': String(i), 'data-field': 't', placeholder: 'Texto del botón' }));
+      const tools = el('div', { class: 'edit-tools' });
+      tools.appendChild(el('button', { type: 'button', 'data-move': 'up', 'data-idx': String(i), 'aria-label': 'Subir', text: '↑', disabled: i === 0 }));
+      tools.appendChild(el('button', { type: 'button', 'data-move': 'down', 'data-idx': String(i), 'aria-label': 'Bajar', text: '↓', disabled: i === items.length - 1 }));
+      tools.appendChild(el('button', { type: 'button', 'data-del': String(i), 'aria-label': 'Quitar frase', text: '🗑' }));
+      row.appendChild(tools);
+      row.appendChild(el('input', { class: 'edit-say', type: 'text', value: item.s ? gen(item.s) : '', 'aria-label': 'Lo que se dice', 'data-idx': String(i), 'data-field': 's', placeholder: 'Lo que se dice (opcional)' }));
       list.appendChild(row);
     });
   }
@@ -876,7 +1008,6 @@
     if (!Array.isArray(vocab[catId])) vocab[catId] = categoryById(catId).items.map(i => Object.assign({}, i));
     return vocab[catId];
   }
-  function saveVocab() { store.set(KEYS.vocab, vocab); }
 
   function exportBackup() {
     return JSON.stringify({ app: 'talk-again', v: 1, settings, vocab, words: learned, saved, builder: builderStats }, null, 0);
@@ -885,11 +1016,11 @@
     let data;
     try { data = JSON.parse(text); } catch (e) { toast('El texto no es una copia válida'); return false; }
     if (!data || data.app !== 'talk-again') { toast('El texto no es una copia de Talk Again'); return false; }
-    settings = Object.assign({}, DEFAULT_SETTINGS, data.settings || {});
-    vocab = data.vocab && typeof data.vocab === 'object' ? data.vocab : {};
-    learned = data.words && typeof data.words === 'object' ? data.words : {};
-    saved = Array.isArray(data.saved) ? data.saved : [];
-    builderStats = data.builder && typeof data.builder === 'object' ? data.builder : {};
+    settings = sanitizeSettings(data.settings);
+    vocab = sanitizeVocab(data.vocab);
+    learned = data.words && typeof data.words === 'object' && !Array.isArray(data.words) ? data.words : {};
+    saved = Array.isArray(data.saved) ? data.saved.filter(s => typeof s === 'string') : [];
+    builderStats = data.builder && typeof data.builder === 'object' && !Array.isArray(data.builder) ? data.builder : {};
     saveSettings(); saveVocab(); store.set(KEYS.words, learned); store.set(KEYS.saved, saved); store.set(KEYS.builder, builderStats);
     applySettings(); renderSettings();
     toast('Copia restaurada');
@@ -905,13 +1036,13 @@
     gestureTimer = setTimeout(() => panel.classList.remove('is-gesture'), 900);
     if (currentView === 'yesno') { answer(g === 'yes' ? 'Sí' : 'No'); return; }
     if (scanner.active) { if (g === 'yes') scanner.select(); else scanner.back(); return; }
-    answer(g === 'yes' ? 'Sí' : 'No');
+    // En las demás pantallas un gesto no dice nada: evita respuestas falsas al mirar alrededor.
   }
   function onCamStatus(state, msg, extra) {
     $('#cam-status').textContent = msg;
     const note = $('#cam-note');
     if (state === 'face' && extra && note) {
-      note.textContent = `Cara detectada. Inclinación ${extra.pitch > 0 ? '+' : ''}${extra.pitch.toFixed(0)}°, giro ${extra.yaw > 0 ? '+' : ''}${extra.yaw.toFixed(0)}°. Asentir = Sí, negar = No.`;
+      note.textContent = `Cara detectada. Inclinación ${extra.pitch > 0 ? '+' : ''}${extra.pitch.toFixed(0)}°, giro ${extra.yaw > 0 ? '+' : ''}${extra.yaw.toFixed(0)}°. Asentir = Sí, negar = No (solo en Sí / No y durante el barrido).`;
     }
     if (state === 'error') {
       toast(msg, 6000);
@@ -939,34 +1070,68 @@
   }
 
   /* ---------------- Eventos ---------------- */
+  let lastHit = { el: null, t: 0 };
   function bind() {
     $('#btn-home').addEventListener('click', () => show('home'));
     $('#btn-settings').addEventListener('click', () => show(currentView === 'settings' ? 'home' : 'settings'));
-    $('#btn-help').addEventListener('click', help);
     $('#btn-scan').addEventListener('click', () => scanner.toggle());
     $('#btn-scan-select').addEventListener('click', () => scanner.select());
     $('#btn-scan-pause').addEventListener('click', () => scanner.pauseToggle());
 
-    // Selección tocando la pantalla durante el barrido (fase de captura para adelantarse a los botones).
+    // AYUDA: mantener presionado medio segundo (evita alarmas por un roce). Teclado y barrido la activan directamente.
+    const helpBtn = $('#btn-help');
+    const HOLD_MS = 600;
+    let holdTimer = 0, cooling = false;
+    const fireHelp = () => {
+      if (cooling) return;
+      cooling = true; helpBtn.classList.add('is-cooling');
+      setTimeout(() => { cooling = false; helpBtn.classList.remove('is-cooling'); }, 1500);
+      help();
+    };
+    const cancelHold = () => { clearTimeout(holdTimer); helpBtn.classList.remove('is-holding'); };
+    helpBtn.style.setProperty('--hold-ms', HOLD_MS + 'ms');
+    helpBtn.addEventListener('pointerdown', e => {
+      if (cooling || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      helpBtn.classList.add('is-holding');
+      clearTimeout(holdTimer);
+      holdTimer = setTimeout(() => { cancelHold(); fireHelp(); }, HOLD_MS);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => helpBtn.addEventListener(t, cancelHold));
+    helpBtn.addEventListener('click', e => { if (e.detail === 0) fireHelp(); });
+
+    // Con el barrido en modo "tocar cualquier parte", la cabecera también elige (salvo ⏹ Barrido y AYUDA).
+    $('.topbar').addEventListener('click', e => {
+      if (!scanner.active || scanner.state !== 'running' || settings.scanSelect !== 'screen' || !e.isTrusted) return;
+      if (e.target.closest('#btn-scan, #btn-help')) return;
+      e.preventDefault(); e.stopPropagation();
+      scanner.select();
+    }, true);
+
+    // Clicks dentro de la zona central (fase de captura para adelantarse a los botones).
     $('#views').addEventListener('click', e => {
       if (scanner.activating || touch.activating) return;
       const item = e.target.closest('[data-scan]');
-      const real = e.detail !== 0;   // 0 = teclado o click sintético
+      const real = e.isTrusted && e.detail !== 0;   // ni teclado ni click sintético
       if (item && real && !scanner.active && currentView !== 'settings' && !e.target.closest('input, select, textarea, label, a')) {
         // Al deslizar, elige el controlador táctil, no el click del navegador.
         if (settings.touchMode !== 'tap') { e.preventDefault(); e.stopPropagation(); return; }
         // Roces demasiado cortos se ignoran.
         if (settings.minTouchMs > 0 && touch.lastDuration < settings.minTouchMs * 1000) { e.preventDefault(); e.stopPropagation(); return; }
+        // Un doble toque por temblor no repite la frase.
+        const now = performance.now();
+        if (lastHit.el === item && now - lastHit.t < 400) { e.preventDefault(); e.stopPropagation(); return; }
+        lastHit = { el: item, t: now };
       }
-      if (!scanner.active) return;
+      if (!scanner.active || !e.isTrusted) return;
       if (currentView === 'settings' || scanner.state === 'paused') return;
       if (settings.scanSelect !== 'screen') return;
-      if (e.target.closest('input, select, textarea, label, a')) return;
+      if (e.target.closest('input, select, textarea, label, a, .question-row')) return;
       e.preventDefault(); e.stopPropagation();
       scanner.select();
     }, true);
 
     document.addEventListener('keydown', e => {
+      if (e.repeat) return;   // un pulsador mantenido no dispara varias veces
       const tag = (e.target && e.target.tagName || '').toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
       if (scanner.active) {
@@ -983,6 +1148,30 @@
       }
     });
 
+    // Desbloqueo de la voz y del sonido con el primer gesto real (iOS, Chrome).
+    ['touchend', 'pointerup', 'keydown', 'click'].forEach(t => document.addEventListener(t, () => {
+      speech.unlock();
+      if (audioCtx && audioCtx.state !== 'running') { try { audioCtx.resume(); } catch (e) { /* nada */ } }
+    }, { capture: true, passive: true }));
+
+    // Al pasar a segundo plano se para la voz y el barrido espera; al volver, la voz se reinicia.
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        speech.stop();
+        if (scanner.active && scanner.state === 'running') scanner.idle();
+      } else {
+        try { speechSynthesis.cancel(); speechSynthesis.resume(); } catch (e) { /* nada */ }
+        speech.contentSpeaking = false;
+      }
+    });
+    // iOS deja la página desplazada al cerrar el teclado.
+    document.addEventListener('focusout', () => setTimeout(() => window.scrollTo(0, 0), 50));
+    let resizeTimer = 0;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => { if (currentView === 'spell') { renderKeyboard(); scanner.refresh(); } }, 200);
+    });
+
     // Deslizar para elegir
     const views = $('#views');
     views.addEventListener('pointerdown', e => touch.down(e));
@@ -991,9 +1180,40 @@
     views.addEventListener('pointercancel', e => touch.cancel(e));
     $('#btn-drag-up').addEventListener('click', () => views.scrollBy({ top: -views.clientHeight * 0.7, behavior: 'smooth' }));
     $('#btn-drag-down').addEventListener('click', () => views.scrollBy({ top: views.clientHeight * 0.7, behavior: 'smooth' }));
-    // Desbloqueo de la voz con el primer toque (iOS).
-    document.addEventListener('pointerdown', () => speech.unlock(), { capture: true, once: true });
-    document.addEventListener('keydown', () => speech.unlock(), { capture: true, once: true });
+
+    // Inicio
+    $('#view-home').addEventListener('click', e => {
+      const b = e.target.closest('[data-goto]');
+      if (b) show(b.dataset.goto);
+    });
+
+    // Sí / No
+    $('#view-yesno').addEventListener('click', e => {
+      const b = e.target.closest('[data-answer]');
+      if (b) answer(b.dataset.answer, b.dataset.say, b);
+    });
+    const readQuestion = () => {
+      const q = $('#question-input').value.trim();
+      if (q) speech.say(q); else toast('Escribe la pregunta primero');
+    };
+    $('#btn-ask').addEventListener('click', readQuestion);
+    $('#question-input').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); readQuestion(); } });
+
+    // Frases
+    $('#board-cats').addEventListener('click', e => {
+      const b = e.target.closest('[data-cat]');
+      if (!b) return;
+      currentCat = b.dataset.cat;
+      renderBoard();
+      scanner.refresh();
+    });
+    $('#board-grid').addEventListener('click', e => {
+      const t = e.target.closest('.tile');
+      if (!t) return;
+      speech.say(t.dataset.say);
+      addHistory('phrase', t.dataset.label);
+      flashEl(t);
+    });
 
     // Armar frase
     $('#view-build').addEventListener('click', e => {
@@ -1016,7 +1236,7 @@
         const m = md.dataset.mod;
         const i = build.mods.indexOf(m);
         if (i >= 0) build.mods.splice(i, 1); else build.mods.push(m);
-        renderBuild(); buildSpeak(); scanner.refresh(); return;
+        renderBuild(); buildSpeak(); scanner.refresh();
       }
     });
     $('#btn-build-speak').addEventListener('click', buildSpeak);
@@ -1027,39 +1247,6 @@
       if (!s || !build.next) { toast('Primero arma la frase'); return; }
       if (!saved.includes(s)) { saved.push(s); store.set(KEYS.saved, saved); }
       toast('Guardada en «Frases guardadas» de Deletrear');
-    });
-
-    // Inicio
-    $('#view-home').addEventListener('click', e => {
-      const b = e.target.closest('[data-goto]');
-      if (b) show(b.dataset.goto);
-    });
-
-    // Sí / No
-    $('#view-yesno').addEventListener('click', e => {
-      const b = e.target.closest('[data-answer]');
-      if (b) answer(b.dataset.answer, b.dataset.say, b);
-    });
-    $('#btn-ask').addEventListener('click', () => {
-      const q = $('#question-input').value.trim();
-      if (q) speech.say(q); else toast('Escribe la pregunta primero');
-    });
-    $('#question-input').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#btn-ask').click(); } });
-
-    // Frases
-    $('#board-cats').addEventListener('click', e => {
-      const b = e.target.closest('[data-cat]');
-      if (!b) return;
-      currentCat = b.dataset.cat;
-      renderBoard();
-      scanner.refresh();
-    });
-    $('#board-grid').addEventListener('click', e => {
-      const t = e.target.closest('.tile');
-      if (!t) return;
-      speech.say(t.dataset.say);
-      addHistory('phrase', t.dataset.label);
-      flashEl(t);
     });
 
     // Deletrear
@@ -1085,16 +1272,19 @@
       const say = e.target.closest('[data-saved]');
       if (say) { const t = saved[Number(say.dataset.saved)]; speech.say(t); addHistory('spell', t); }
     });
-    $('#btn-spell-speak-top').addEventListener('click', () => spellAction('speak'));
+    $('#btn-spell-speak-top').addEventListener('click', () => { spellAction('speak'); scanner.refresh(); });
 
     // Dolor
     $('#view-pain').addEventListener('click', e => {
-      const seg = e.target.closest('.seg-btn');
+      const seg = e.target.closest('.seg-btn[data-side]');
       if (seg) { painSide = seg.dataset.side; renderBodyMap(); scanner.refresh(); return; }
       const part = e.target.closest('[data-part]');
       if (part) {
         painPart = part.dataset.part;
-        $$('#body-map [data-part]').forEach(g => g.classList.toggle('is-selected', g.dataset.part === painPart));
+        $$('#body-map [data-part]').forEach(g => {
+          const on = g.dataset.part === painPart;
+          g.classList.toggle('is-selected', on); g.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
         const p = partById(painPart);
         $('#pain-selected').textContent = p ? p.say : '';
         speech.say(part.dataset.say);
@@ -1104,9 +1294,9 @@
       const lvl = e.target.closest('.level');
       if (lvl) {
         const n = Number(lvl.dataset.level);
-        $$('.level').forEach(l => l.classList.toggle('is-selected', l === lvl));
+        $$('.level').forEach(l => { const on = l === lvl; l.classList.toggle('is-selected', on); l.setAttribute('aria-pressed', on ? 'true' : 'false'); });
         const p = painPart ? partById(painPart) : null;
-        const text = (p ? p.say + '. ' : '') + `El dolor es ${n} de 10`;
+        const text = (p ? p.say + '. ' : '') + `El dolor es ${n} de 10, ${D.painLabels[n]}`;
         speech.say(text);
         addHistory('pain', text);
         flashEl(lvl);
@@ -1115,8 +1305,16 @@
       const tile = e.target.closest('#pain-quick .tile');
       if (tile) { speech.say(tile.dataset.say); addHistory('pain', tile.dataset.label); flashEl(tile); }
     });
+    $('#body-map').addEventListener('keydown', e => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const g = e.target.closest('[data-part]');
+      if (!g) return;
+      e.preventDefault();
+      g.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    });
 
     // Historial
+    $('#btn-history-home').addEventListener('click', () => show('home'));
     $('#btn-copy-history').addEventListener('click', () => {
       if (!history.length) { toast('El historial está vacío'); return; }
       copyText(historyAsText(), 'Historial copiado');
@@ -1129,15 +1327,15 @@
     });
 
     // Ajustes
-    const form = $('#settings-form');
-    form.addEventListener('submit', e => e.preventDefault());
+    $('#settings-form').addEventListener('submit', e => e.preventDefault());
+    $('#btn-test-voice').addEventListener('click', () => speech.say(gen('Hola, así sueno. Puedo decir sí, no, tengo sed, o cualquier frase del tablero.')));
     $('#set-voice').addEventListener('change', e => { settings.voiceURI = e.target.value; saveSettings(); });
-    $('#set-rate').addEventListener('input', e => { settings.rate = Number(e.target.value); $('#set-rate-out').textContent = settings.rate.toFixed(2).replace('.', ','); saveSettings(); });
-    $('#btn-test-voice').addEventListener('click', () => speech.say('Hola, así sueno. Puedo decir sí, no, tengo sed, o cualquier frase del tablero.'));
+    $('#set-rate').addEventListener('input', e => { settings.rate = Number(e.target.value); $('#set-rate-out').textContent = rateLabel(settings.rate); saveSettings(); });
     $('#set-scale').addEventListener('change', e => { settings.scale = e.target.value; saveSettings(); applySettings(); });
     $('#set-theme').addEventListener('change', e => { settings.theme = e.target.value; saveSettings(); applySettings(); });
-    const ko = $('#set-keyboard-order');
-    if (ko) ko.addEventListener('change', e => { settings.keyboardOrder = e.target.value; saveSettings(); });
+    $$('[data-gender]').forEach(b => b.addEventListener('click', () => { settings.gender = b.dataset.gender; saveSettings(); renderSettings(); }));
+    $('#set-keyboard-order').addEventListener('change', e => { settings.keyboardOrder = e.target.value; saveSettings(); });
+    $('#set-flash').addEventListener('change', e => { settings.flashAlert = e.target.checked; saveSettings(); });
     $('#set-touch-mode').addEventListener('change', e => { settings.touchMode = e.target.value; saveSettings(); applySettings(); });
     $('#set-dwell').addEventListener('input', e => { settings.dwellMs = Math.round(Number(e.target.value) * 1000); $('#set-dwell-out').textContent = (settings.dwellMs / 1000).toFixed(1).replace('.', ','); saveSettings(); applySettings(); });
     $('#set-min-touch').addEventListener('input', e => { settings.minTouchMs = Number(e.target.value); $('#set-min-touch-out').textContent = settings.minTouchMs.toFixed(2).replace('.', ','); saveSettings(); });
@@ -1174,20 +1372,29 @@
     $('#edit-list').addEventListener('input', e => {
       const inp = e.target.closest('input[data-idx]');
       if (!inp) return;
-      const catId = $('#edit-cat').value;
-      const items = editableItems(catId);
+      const items = editableItems($('#edit-cat').value);
       const item = items[Number(inp.dataset.idx)];
       if (!item) return;
-      item[inp.dataset.field] = inp.value;
-      if (inp.dataset.field === 't') delete item.s;   // al cambiar el texto, se pronuncia lo que se ve
+      const f = inp.dataset.field;
+      if (f === 's') { if (inp.value.trim()) item.s = inp.value; else delete item.s; }
+      else item[f] = inp.value;
       saveVocab();
     });
     $('#edit-list').addEventListener('click', e => {
-      const del = e.target.closest('[data-del]');
-      if (!del) return;
       const catId = $('#edit-cat').value;
-      editableItems(catId).splice(Number(del.dataset.del), 1);
-      saveVocab(); renderEditor();
+      const del = e.target.closest('[data-del]');
+      if (del) { editableItems(catId).splice(Number(del.dataset.del), 1); saveVocab(); renderEditor(); return; }
+      const mv = e.target.closest('[data-move]');
+      if (mv) {
+        const items = editableItems(catId);
+        const i = Number(mv.dataset.idx);
+        const j = mv.dataset.move === 'up' ? i - 1 : i + 1;
+        if (j < 0 || j >= items.length) return;
+        [items[i], items[j]] = [items[j], items[i]];
+        saveVocab(); renderEditor();
+        const btn = $(`#edit-list [data-move="${mv.dataset.move}"][data-idx="${j}"]`);
+        if (btn) btn.focus();
+      }
     });
     $('#btn-edit-add').addEventListener('click', () => {
       const catId = $('#edit-cat').value;
@@ -1196,12 +1403,26 @@
       const inputs = $$('#edit-list .edit-text');
       if (inputs.length) inputs[inputs.length - 1].focus();
     });
-    $('#btn-edit-restore').addEventListener('click', () => {
-      const catId = $('#edit-cat').value;
-      delete vocab[catId]; saveVocab(); renderEditor(); toast('Categoría restaurada');
+    let restoreArmed = 0;
+    $('#btn-edit-restore').addEventListener('click', e => {
+      const b = e.currentTarget;
+      if (!restoreArmed) {
+        b.textContent = '¿Seguro? Toca otra vez para restaurar';
+        restoreArmed = setTimeout(() => { restoreArmed = 0; b.textContent = '↩ Restaurar esta categoría'; }, 4000);
+        return;
+      }
+      clearTimeout(restoreArmed); restoreArmed = 0; b.textContent = '↩ Restaurar esta categoría';
+      delete vocab[$('#edit-cat').value]; saveVocab(); renderEditor(); toast('Categoría restaurada');
     });
 
     $('#btn-backup-copy').addEventListener('click', () => { const t = exportBackup(); $('#backup-text').value = t; copyText(t, 'Copia de seguridad copiada'); });
+    $('#btn-backup-share').addEventListener('click', async () => {
+      const t = exportBackup(); $('#backup-text').value = t;
+      if (navigator.share) {
+        try { await navigator.share({ title: 'Copia de Talk Again', text: t }); return; } catch (e) { /* cancelado */ }
+      }
+      copyText(t, 'Copia de seguridad copiada (este dispositivo no puede compartir directamente)');
+    });
     $('#btn-backup-restore').addEventListener('click', () => importBackup($('#backup-text').value.trim()));
     $('#btn-reset-all').addEventListener('click', () => { $('#reset-confirm').hidden = false; });
     $('#btn-reset-no').addEventListener('click', () => { $('#reset-confirm').hidden = true; });
@@ -1216,7 +1437,21 @@
     if (!('serviceWorker' in navigator)) return;
     const secure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
     if (!secure) return;
-    try { navigator.serviceWorker.register('sw.js').catch(() => { /* no disponible */ }); } catch (e) { /* nada */ }
+    try {
+      navigator.serviceWorker.register('sw.js').then(reg => {
+        const first = reg.installing;
+        if (first && !navigator.serviceWorker.controller) {
+          first.addEventListener('statechange', () => { if (first.state === 'activated') toast('Lista para usar sin internet'); });
+        }
+        reg.addEventListener('updatefound', () => {
+          const w = reg.installing;
+          if (!w) return;
+          w.addEventListener('statechange', () => {
+            if (w.state === 'activated' && navigator.serviceWorker.controller) toast('Hay una versión nueva: cierra y vuelve a abrir la app', 6000);
+          });
+        });
+      }).catch(() => { /* no disponible */ });
+    } catch (e) { /* nada */ }
   }
 
   /* ---------------- Arranque ---------------- */
@@ -1233,8 +1468,20 @@
     }
     show('home');
     registerSW();
-    if (settings.scanAuto) scanner.start();
-    if (settings.cam) startCamera();
+    if (settings.scanAuto || (settings.cam && !window.TA_ARTIFACT)) {
+      // La voz y la cámara necesitan un primer toque: una pantalla de "empezar" lo garantiza.
+      const gate = el('button', { class: 'start-gate', type: 'button' }, [
+        el('span', { text: '👆 Toca para empezar' }),
+        el('small', { text: settings.scanAuto ? 'Se activará el barrido automático' : 'Se activará la cámara' })
+      ]);
+      document.body.appendChild(gate);
+      gate.addEventListener('click', () => {
+        gate.remove();
+        speech.unlock();
+        if (settings.scanAuto) scanner.start();
+        if (settings.cam && !window.TA_ARTIFACT) startCamera();
+      }, { once: true });
+    }
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
